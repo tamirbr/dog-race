@@ -286,6 +286,93 @@ window.DogRace = window.DogRace || {};
     };
   };
 
+  DogRace.applyServerRaceState = function (race, state, localPlayerId) {
+    if (!race || !state) return;
+    const prevPhase = race.phase;
+    const prevCount = race.lastCount;
+    race.phase = state.phase;
+    race.time = state.time;
+    race.countdown = state.countdown;
+    race.serverAuthority = true;
+    race.events.length = 0;
+
+    if (state.phase === "countdown") {
+      const n = Math.ceil(state.countdown);
+      if (n !== prevCount && n > 0 && n <= 3) {
+        race.events.push({ type: "count", value: n });
+        race.lastCount = n;
+      }
+    }
+    if (prevPhase === "countdown" && state.phase === "running") {
+      race.events.push({ type: "go" });
+      race.lastCount = 0;
+    }
+
+    (state.participants || []).forEach((sp) => {
+      let p = race.participants.find((r) => r.id === sp.id);
+      if (!p) return;
+      const wasZ = p.z;
+      p.z = sp.z;
+      p.lane = sp.lane;
+      p.x = sp.x;
+      p.speed = sp.speed;
+      p.boosting = sp.boosting;
+      p.jumpHeight = sp.jumpHeight || 0;
+      p.finished = sp.finished;
+      p.finishPlace = sp.finishPlace;
+      p.coins = sp.coins || 0;
+      p.bounce += 0.12;
+      if (!p.finished && sp.finished && p.id === localPlayerId) {
+        race.events.push({ type: "finish", who: p });
+      }
+      if (sp.finished && !p._finishAnnounced) {
+        p._finishAnnounced = true;
+      }
+      if (Math.abs(sp.z - wasZ) > 0.5) p.lean = clamp((sp.z - wasZ) * 0.02, -1, 1);
+    });
+
+    packSameLane(race);
+    rankParticipants(race);
+    race.player = race.participants.find((p) => p.id === localPlayerId) || race.player;
+  };
+
+  DogRace.buildMultiplayerResults = function (race, placement, allPlacements) {
+    const eco = DogRace.Config.economy;
+    const km = DogRace.Config.kidMode || {};
+    const kidMul = DogRace.Save && DogRace.Save.data && DogRace.Save.data.settings.kidMode ? (km.coinBonusMul || 1) : 1;
+    const place = placement.place;
+    const placeCoins = Math.round((eco.placeCoins[place - 1] || 25) * race.track.rewardMultiplier * kidMul);
+    const pickedCoins = placement.coins || 0;
+    const xp = Math.round(((eco.placeXp[place - 1] || 20) + eco.finishXp) * race.track.rewardMultiplier);
+    const stars = place === 1 ? 3 : place <= 3 ? 2 : 1;
+    const ranked = (allPlacements || []).slice().sort((a, b) => a.place - b.place).map((row) => {
+      const p = race.participants.find((r) => r.id === row.id);
+      return {
+        id: row.id,
+        name: row.nickname || (p && p.name) || row.id,
+        place: row.place,
+        dogId: row.dogId,
+        isBot: row.isBot,
+      };
+    });
+    return {
+      place,
+      stars,
+      field: race.participants.length,
+      dogId: race.player.dogId,
+      trackId: race.track.id,
+      placeCoins,
+      pickedCoins,
+      totalCoins: placeCoins + pickedCoins,
+      xp,
+      time: placement.time || race.time,
+      hits: race.player.hits,
+      boostsUsed: race.player.boostsUsed,
+      ranked,
+      multiplayer: true,
+    };
+  };
+
   function updateLocal(p, input) {
     if (input.laneDelta) p.lane = clampLane(p.lane + input.laneDelta);
     if (input.lane != null) p.lane = clampLane(input.lane);
@@ -541,7 +628,7 @@ window.DogRace = window.DogRace || {};
     };
   }
 
-  DogRace.createRace = function ({ track, playerDogId, fieldSize, participants, seed, multiplayer, startAt }) {
+  DogRace.createRace = function ({ track, playerDogId, fieldSize, participants, seed, multiplayer, startAt, serverAuthority }) {
     const course = DogRace.buildCourse(track, seed);
     const difficulty = raceDifficulty(track.aiDifficulty);
     let field;
@@ -619,6 +706,7 @@ window.DogRace = window.DogRace || {};
       bursts: [],
       multiplayer: !!multiplayer,
       startAt: startAt || 0,
+      serverAuthority: !!serverAuthority,
     };
   };
 

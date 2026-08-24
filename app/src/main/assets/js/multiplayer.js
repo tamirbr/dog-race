@@ -3,6 +3,7 @@ window.DogRace = window.DogRace || {};
 (function () {
   const STORAGE_URL = "dograce.mp.url";
   const STORAGE_TOKEN = "dograce.mp.token";
+  const STORAGE_NICKNAME = "dograce.mp.nickname";
   const Kind = DogRace.ParticipantKind || { LOCAL: "local", AI: "ai", REMOTE: "remote" };
 
   let available = false;
@@ -16,6 +17,8 @@ window.DogRace = window.DogRace || {};
   let queueWaiting = false;
   let pendingInvite = null;
   let racePayload = null;
+  let latestRaceState = null;
+  let latestRaceResults = null;
   let playerId = null;
   let onLobbyUpdate = null;
   let onRaceStart = null;
@@ -62,6 +65,37 @@ window.DogRace = window.DogRace || {};
     } catch (err) {
       /* ignore */
     }
+  }
+
+  function savedNickname() {
+    try {
+      return localStorage.getItem(STORAGE_NICKNAME) || "";
+    } catch (err) {
+      return "";
+    }
+  }
+
+  function saveNickname(name) {
+    if (!name) return;
+    try {
+      localStorage.setItem(STORAGE_NICKNAME, name);
+    } catch (err) {
+      /* ignore */
+    }
+  }
+
+  async function restoreNickname(data) {
+    const saved = savedNickname();
+    if (saved && saved !== data.nickname) {
+      const res = await rpc("nickname:rename", saved);
+      if (res.ok) {
+        saveNickname(res.nickname);
+        if (DogRace.UI && DogRace.UI.setMpNickname) DogRace.UI.setMpNickname(res.nickname);
+        return res.nickname;
+      }
+    }
+    if (data.nickname) saveNickname(data.nickname);
+    return data.nickname;
   }
 
   function emitToast(msg, icon) {
@@ -122,7 +156,7 @@ window.DogRace = window.DogRace || {};
       const url = backendUrl().replace(/\/$/, "");
       socket = io(url, {
         transports: ["websocket", "polling"],
-        auth: { token: reconnectToken() },
+        auth: { token: reconnectToken(), nickname: savedNickname() || undefined },
         reconnection: true,
         reconnectionAttempts: 5,
       });
@@ -141,13 +175,15 @@ window.DogRace = window.DogRace || {};
         playerId = socket.id;
       });
 
-      socket.on("session:new", (data) => {
+      socket.on("session:new", async (data) => {
         saveToken(data.token);
-        if (DogRace.UI && DogRace.UI.setMpNickname) DogRace.UI.setMpNickname(data.nickname);
+        const nick = await restoreNickname(data);
+        if (DogRace.UI && DogRace.UI.setMpNickname) DogRace.UI.setMpNickname(nick);
       });
-      socket.on("session:restored", (data) => {
+      socket.on("session:restored", async (data) => {
         saveToken(data.token);
-        if (DogRace.UI && DogRace.UI.setMpNickname) DogRace.UI.setMpNickname(data.nickname);
+        const nick = await restoreNickname(data);
+        if (DogRace.UI && DogRace.UI.setMpNickname) DogRace.UI.setMpNickname(nick);
         if (data.lobbyId && data.status === "lobby") {
           /* lobby:update will follow */
         }
@@ -200,9 +236,21 @@ window.DogRace = window.DogRace || {};
 
       socket.on("race:start", (data) => {
         racePayload = data;
+        latestRaceState = null;
+        latestRaceResults = null;
         lobby = lobby ? Object.assign({}, lobby, { state: "racing" }) : null;
         if (onRaceStart) onRaceStart(data);
         else if (window.DogRaceApp && DogRaceApp.startMultiplayerRace) DogRaceApp.startMultiplayerRace(data);
+      });
+
+      socket.on("race:state", (state) => {
+        latestRaceState = state;
+        if (window.DogRaceApp && DogRaceApp.applyServerRaceState) DogRaceApp.applyServerRaceState(state);
+      });
+
+      socket.on("race:results", (data) => {
+        latestRaceResults = data;
+        if (window.DogRaceApp && DogRaceApp.finishMultiplayerResults) DogRaceApp.finishMultiplayerResults(data);
       });
 
       socket.on("race:rejoin", (data) => {
@@ -285,7 +333,10 @@ window.DogRace = window.DogRace || {};
     },
 
     rename(nickname) {
-      return rpc("nickname:rename", nickname);
+      return rpc("nickname:rename", nickname).then((res) => {
+        if (res.ok && res.nickname) saveNickname(res.nickname);
+        return res;
+      });
     },
 
     setDog(dogId) {
@@ -407,23 +458,9 @@ window.DogRace = window.DogRace || {};
       if (DogRace.UI && DogRace.UI.onLobbyLeft) DogRace.UI.onLobbyLeft();
     },
 
-    startSyncLoop(race, playerId) {
-      if (syncTimer) clearInterval(syncTimer);
-      const ms = DogRace.Config.multiplayer.syncIntervalMs || 100;
-      syncTimer = setInterval(() => {
-        if (!socket || !socket.connected || !race || !race.player) return;
-        const p = race.player;
-        socket.emit("race:sync", {
-          z: p.z,
-          lane: p.lane,
-          x: p.x,
-          speed: p.speed,
-          finished: p.finished,
-          finishPlace: p.finishPlace,
-          boosting: p.boosting,
-          jumpHeight: p.jumpHeight,
-        });
-      }, ms);
+    sendRaceInput(input) {
+      if (!socket || !socket.connected) return;
+      socket.emit("race:input", input || {});
     },
 
     stopSyncLoop() {
@@ -431,10 +468,12 @@ window.DogRace = window.DogRace || {};
         clearInterval(syncTimer);
         syncTimer = null;
       }
+      latestRaceState = null;
+      latestRaceResults = null;
     },
 
-    reportFinish(place, time) {
-      return rpc("race:done", { place, time });
+    getLatestRaceState() {
+      return latestRaceState;
     },
 
     buildRaceFromPayload(payload, localPlayerId, localDogId) {
@@ -462,6 +501,7 @@ window.DogRace = window.DogRace || {};
         seed: payload.seed,
         multiplayer: true,
         startAt: payload.startAt,
+        serverAuthority: payload.authority === "server",
       });
     },
   };

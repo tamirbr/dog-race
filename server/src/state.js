@@ -44,8 +44,15 @@ export function publicPlayer(p) {
   };
 }
 
-export function createPlayer(socketId) {
-  const nickname = randomNickname();
+export function createPlayer(socketId, preferredNickname) {
+  let nickname = randomNickname();
+  if (preferredNickname) {
+    const trimmed = String(preferredNickname).trim();
+    const key = trimmed.toLowerCase();
+    if (trimmed.length >= 2 && trimmed.length <= 16 && /^[a-zA-Z0-9_]+$/.test(trimmed) && !nicknames.has(key)) {
+      nickname = trimmed;
+    }
+  }
   const token = uuid();
   const player = {
     id: socketId,

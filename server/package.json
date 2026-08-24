@@ -8,7 +8,9 @@
   "scripts": {
     "start": "node src/index.js",
     "dev": "node --watch src/index.js",
-    "test:social": "node test/social-flow.mjs"
+    "test:social": "node test/social-flow.mjs",
+    "test:race": "node test/race-sync.mjs",
+    "test:nickname": "node test/nickname-persist.mjs"
   },
   "engines": {
     "node": ">=18"

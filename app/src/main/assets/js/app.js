@@ -82,30 +82,38 @@ window.DogRace = window.DogRace || {};
     App.input.boostRequest = false;
     App.input.jump = false;
     $("pause-overlay").classList.add("hidden");
-    const delay = Math.max(0, (payload.startAt || 0) - Date.now());
     DogRace.UI.setCountdown("3");
     go("race");
-    if (delay > 50) {
-      App.race.phase = "countdown";
-      App.race.countdown = delay / 1000 + DogRace.Config.race.startHold;
-      App.race.lastCount = Math.ceil(App.race.countdown) + 1;
-    }
     DogRace.Audio.play("countdown");
-    mp.startSyncLoop(App.race, App.mpPlayerId);
   }
 
-  function applyPeerSync(data) {
-    if (!App.race) return;
-    DogRace.applyRemoteSync(App.race, data);
+  function applyServerRaceState(state) {
+    if (!App.race || !state) return;
+    DogRace.applyServerRaceState(App.race, state, App.mpPlayerId);
+    handleEvents(App.race.events);
+    if (state.phase === "results" && !App.race._resultsHandled) {
+      App.race._resultsHandled = true;
+    }
+  }
+
+  function finishMultiplayerResults(data) {
+    if (!App.race || !data || !data.placements) return;
+    const mine = data.placements.find((p) => p.id === App.mpPlayerId);
+    if (!mine) return;
+    if (App.race.results) return;
+    DogRace.Multiplayer.stopSyncLoop();
+    App.race.results = DogRace.buildMultiplayerResults(App.race, mine, data.placements);
+    App.race.phase = "results";
+    finishRace();
   }
   App.startMultiplayerRace = startMultiplayerRace;
-  App.applyPeerSync = applyPeerSync;
+  App.applyServerRaceState = applyServerRaceState;
+  App.finishMultiplayerResults = finishMultiplayerResults;
 
   function finishRace() {
     if (!App.race || !App.race.results) return;
     if (App.multiplayerRace && DogRace.Multiplayer) {
       DogRace.Multiplayer.stopSyncLoop();
-      DogRace.Multiplayer.reportFinish(App.race.results.place, App.race.results.time);
     }
     const outcome = DogRace.Save.applyRaceOutcome(App.race.results);
     const leveled = outcome.leveled || 0;
@@ -202,11 +210,17 @@ window.DogRace = window.DogRace || {};
 
     if (App.screen === "race" && App.race && !App.paused) {
       const step = DogRace.Config.race.timestep;
-      while (App.accum >= step) {
-        DogRace.stepRace(App.race, readInput(), step);
-        handleEvents(App.race.events);
-        App.accum -= step;
-        if (App.screen !== "race") break;
+      if (App.multiplayerRace && App.race.serverAuthority) {
+        DogRace.Multiplayer.sendRaceInput(readInput());
+        const state = DogRace.Multiplayer.getLatestRaceState();
+        if (state) applyServerRaceState(state);
+      } else {
+        while (App.accum >= step) {
+          DogRace.stepRace(App.race, readInput(), step);
+          handleEvents(App.race.events);
+          App.accum -= step;
+          if (App.screen !== "race") break;
+        }
       }
       if (App.screen === "race" && App.race) {
         const canvas = App.canvas;

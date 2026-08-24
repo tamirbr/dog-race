@@ -3,6 +3,11 @@ import cors from "cors";
 import http from "http";
 import { Server } from "socket.io";
 import {
+  startHostedRace,
+  setRaceInput,
+  stopHostedRace,
+} from "./race-host.js";
+import {
   MAX_LOBBY_PLAYERS,
   MATCH_QUEUE_TIMEOUT_MS,
   MATCH_QUEUE_MIN_HUMANS,
@@ -117,31 +122,10 @@ function leaveLobby(player, notify = true) {
   if (notify) emitLobby(lobby);
 }
 
-function startRace(lobby, trackId) {
+function startRace(lobby) {
   lobby.state = "racing";
-  lobby.trackId = trackId || lobby.trackId;
   lobby.raceSeed = Math.floor(Math.random() * 2147483647);
-  const startAt = Date.now() + 3500;
-  const payload = {
-    lobbyId: lobby.id,
-    trackId: lobby.trackId,
-    seed: lobby.raceSeed,
-    startAt,
-    participants: lobby.slots.map((s, i) => ({
-      id: s.id,
-      nickname: s.nickname,
-      dogId: s.dogId,
-      isBot: s.isBot,
-      slot: i,
-    })),
-  };
-  lobbyHumans(lobby).forEach((slot) => {
-    const p = getPlayer(slot.id);
-    if (p) {
-      p.status = "racing";
-      io.to(p.id).emit("race:start", payload);
-    }
-  });
+  startHostedRace(lobby, io, getPlayer, emitLobby);
   emitLobby(lobby);
 }
 
@@ -170,7 +154,7 @@ function tryMatchmake() {
       if (slot) slot.ready = true;
     });
     fillBots(lobby);
-    startRace(lobby, lobby.trackId);
+    startRace(lobby);
     return;
   }
 
@@ -194,7 +178,7 @@ function tryMatchmake() {
       if (slot) slot.ready = true;
     });
     fillBots(lobby);
-    startRace(lobby, lobby.trackId);
+    startRace(lobby);
   }
 }
 
@@ -231,7 +215,7 @@ io.on("connection", (socket) => {
       }
     }
   } else {
-    player = createPlayer(socket.id);
+    player = createPlayer(socket.id, socket.handshake.auth?.nickname);
     socket.emit("session:new", {
       nickname: player.nickname,
       token: player.reconnectToken,
@@ -494,41 +478,10 @@ io.on("connection", (socket) => {
     cb?.({ ok: true });
   });
 
-  socket.on("race:sync", (data) => {
+  socket.on("race:input", (input) => {
     const lobby = getLobby(player.lobbyId);
     if (!lobby || lobby.state !== "racing") return;
-    socket.to(lobby.id).emit("race:peer", {
-      id: player.id,
-      z: data.z,
-      lane: data.lane,
-      x: data.x,
-      speed: data.speed,
-      finished: data.finished,
-      finishPlace: data.finishPlace,
-      boosting: data.boosting,
-      jumpHeight: data.jumpHeight,
-    });
-  });
-
-  socket.on("race:done", (data, cb) => {
-    const lobby = getLobby(player.lobbyId);
-    if (!lobby) return cb?.({ ok: false });
-    const slot = findPlayerSlot(lobby, player.id);
-    if (slot) {
-      slot.finishPlace = data.place;
-      slot.finishTime = data.time;
-    }
-    const humans = lobbyHumans(lobby);
-    const allDone = humans.every((s) => s.finishPlace || s.finished);
-    if (allDone) {
-      lobby.state = "waiting";
-      lobby.slots.forEach((s) => {
-        s.ready = false;
-        s.finishPlace = 0;
-      });
-      emitLobby(lobby);
-    }
-    cb?.({ ok: true });
+    setRaceInput(lobby.id, player.id, input || {});
   });
 
   socket.on("disconnect", () => {
