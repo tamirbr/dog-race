@@ -10,7 +10,7 @@ window.DogRace = window.DogRace || {};
     paused: false,
     fx: { shake: 0 },
     renameDogId: "",
-    input: { laneDelta: 0, boost: false, jump: false },
+    input: { laneDelta: 0, boostRequest: false, jump: false },
     swipe: { x: 0, y: 0, active: false },
     keys: {},
     canvas: null,
@@ -44,7 +44,7 @@ window.DogRace = window.DogRace || {};
     });
     App.paused = false;
     App.input.laneDelta = 0;
-    App.input.boost = false;
+    App.input.boostRequest = false;
     App.input.jump = false;
     $("pause-overlay").classList.add("hidden");
     DogRace.UI.setCountdown("3");
@@ -54,8 +54,12 @@ window.DogRace = window.DogRace || {};
 
   function finishRace() {
     if (!App.race || !App.race.results) return;
-    const leveled = DogRace.Save.applyRaceOutcome(App.race.results);
+    const outcome = DogRace.Save.applyRaceOutcome(App.race.results);
+    const leveled = outcome.leveled || 0;
     DogRace.UI.renderResults(App.race.results, leveled);
+    if (outcome.newAchievements && outcome.newAchievements.length) {
+      DogRace.UI.showStickers(outcome.newAchievements);
+    }
     if (App.race.results.place === 1) {
       DogRace.Audio.play("win");
     } else if (App.race.results.place <= 3) {
@@ -86,6 +90,7 @@ window.DogRace = window.DogRace || {};
       }
       if (ev.type === "coin" && ev.who === App.race.player) {
         DogRace.Audio.play("coin", { rate: 0.95 + Math.random() * 0.15 });
+        DogRace.UI.showCoinFloat(DogRace.Config.economy.coinPickupValue);
       }
       if (ev.type === "pickup" && ev.who === App.race.player) DogRace.Audio.play("pickup");
       if (ev.type === "boost" && ev.who === App.race.player) {
@@ -122,10 +127,11 @@ window.DogRace = window.DogRace || {};
   function readInput() {
     const input = {
       laneDelta: App.input.laneDelta,
-      boost: App.input.boost || App.keys[" "] || App.keys.Shift,
+      boostRequest: App.input.boostRequest,
       jump: App.input.jump || App.keys.ArrowUp || App.keys.w || App.keys.W,
     };
     App.input.laneDelta = 0;
+    App.input.boostRequest = false;
     App.input.jump = false;
     return input;
   }
@@ -169,7 +175,7 @@ window.DogRace = window.DogRace || {};
 
     const raceScreen = $("screen-race");
     const beginSwipe = (e) => {
-      if (e.target.closest && e.target.closest("#btn-boost, #btn-jump, #btn-pause, .overlay")) return;
+      if (e.target.closest && e.target.closest("#btn-boost, #btn-jump, #btn-pause, #race-controls, .overlay, .pause-big")) return;
       App.swipe.active = true;
       App.swipe.x = e.clientX;
       App.swipe.y = e.clientY;
@@ -198,19 +204,13 @@ window.DogRace = window.DogRace || {};
       App.swipe.active = false;
     });
 
-    const startBoost = (e) => {
+    const tapBoost = (e) => {
       e.preventDefault();
-      App.input.boost = true;
-      boost.classList.add("hot");
+      if (App.screen !== "race" || !App.race || App.paused) return;
+      const p = App.race.player;
+      if (!p.boostLatched && !p.boosting && p.boostMeter > 0) App.input.boostRequest = true;
     };
-    const endBoost = () => {
-      App.input.boost = false;
-      boost.classList.remove("hot");
-    };
-    boost.addEventListener("pointerdown", startBoost);
-    boost.addEventListener("pointerup", endBoost);
-    boost.addEventListener("pointerleave", endBoost);
-    boost.addEventListener("pointercancel", endBoost);
+    boost.addEventListener("pointerdown", tapBoost);
 
     const jumpBtn = $("btn-jump");
     const startJump = (e) => {
@@ -223,10 +223,31 @@ window.DogRace = window.DogRace || {};
     jumpBtn.addEventListener("pointerup", endJump);
     jumpBtn.addEventListener("pointerleave", endJump);
     jumpBtn.addEventListener("pointercancel", endJump);
+
+    function bindSteerButton(btn, dir) {
+      const press = (e) => {
+        e.preventDefault();
+        changeLane(dir);
+        btn.classList.add("hot");
+        DogRace.Audio.play("click", { volume: 0.35 });
+      };
+      const release = () => btn.classList.remove("hot");
+      btn.addEventListener("pointerdown", press);
+      btn.addEventListener("pointerup", release);
+      btn.addEventListener("pointerleave", release);
+      btn.addEventListener("pointercancel", release);
+    }
+    bindSteerButton($("btn-steer-left"), -1);
+    bindSteerButton($("btn-steer-right"), 1);
   }
 
   function onAction(action) {
     if (action === "finish-tutorial") {
+      DogRace.Save.data.tutorialDone = true;
+      DogRace.Save.persist();
+      go("menu");
+    }
+    if (action === "skip-tutorial") {
       DogRace.Save.data.tutorialDone = true;
       DogRace.Save.persist();
       go("menu");
@@ -322,8 +343,12 @@ window.DogRace = window.DogRace || {};
       }
       if (btn.dataset.track) startRace(btn.dataset.track);
       if (btn.dataset.claimMission) {
-        if (DogRace.Save.claimMission(btn.dataset.claimMission)) DogRace.Audio.play("win", { volume: 0.45 });
+        if (DogRace.Save.claimMission(btn.dataset.claimMission)) {
+          DogRace.Audio.play("win", { volume: 0.45 });
+          DogRace.UI.toast(DogRace.I18n.t("ui.missionClaimed"), "🎁");
+        }
         DogRace.UI.renderMissions();
+        if (App.screen === "menu") DogRace.UI.renderMenu();
       }
     });
 
@@ -350,6 +375,14 @@ window.DogRace = window.DogRace || {};
       DogRace.Save.data.settings.vibration = e.target.checked;
       DogRace.Save.persist();
     });
+    const kidToggle = $("set-kid");
+    if (kidToggle) {
+      kidToggle.addEventListener("change", (e) => {
+        DogRace.Save.data.settings.kidMode = e.target.checked;
+        DogRace.Save.persist();
+        if (App.screen === "tracks") DogRace.UI.renderTracks();
+      });
+    }
 
     window.addEventListener("keydown", (e) => {
       if (!$("lang-picker").classList.contains("hidden")) {
@@ -369,12 +402,12 @@ window.DogRace = window.DogRace || {};
       if (!e.repeat && (e.key === "ArrowLeft" || e.key === "a" || e.key === "A")) changeLane(-1);
       if (!e.repeat && (e.key === "ArrowRight" || e.key === "d" || e.key === "D")) changeLane(1);
       if (!e.repeat && (e.key === "ArrowUp" || e.key === "w" || e.key === "W")) App.input.jump = true;
+      if (!e.repeat && (e.key === " " || e.key === "Shift")) App.input.boostRequest = true;
       if (e.key === "Escape" && App.screen === "race") $("btn-pause").click();
       if (e.key === "Enter" && App.screen === "menu") go("tracks");
     });
     window.addEventListener("keyup", (e) => {
       App.keys[e.key] = false;
-      if (e.key === " " || e.key === "Shift") App.input.boost = false;
     });
 
     window.onAndroidBack = function () {

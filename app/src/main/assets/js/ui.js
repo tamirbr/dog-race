@@ -89,6 +89,34 @@ window.DogRace = window.DogRace || {};
     return t("track." + track.id + ".name");
   }
 
+  function starsHtml(count) {
+    let html = "";
+    for (let i = 1; i <= 3; i++) {
+      html += `<span class="star ${i <= count ? "on" : ""}">★</span>`;
+    }
+    return html;
+  }
+
+  function missionProgressPct(progress, target) {
+    return Math.max(4, Math.min(100, (progress / Math.max(1, target)) * 100));
+  }
+
+  function spawnConfetti(host, count) {
+    if (!host) return;
+    host.innerHTML = "";
+    const colors = ["#FFD23F", "#FF7A29", "#7CDE46", "#4EA2FF", "#FF8FAB", "#C084FC", "#FFF6D9"];
+    for (let i = 0; i < count; i++) {
+      const bit = document.createElement("i");
+      bit.style.left = Math.random() * 100 + "%";
+      bit.style.animationDelay = Math.random() * 0.8 + "s";
+      bit.style.animationDuration = 1.6 + Math.random() * 1.2 + "s";
+      bit.style.background = colors[i % colors.length];
+      bit.style.width = 6 + Math.random() * 8 + "px";
+      bit.style.height = 10 + Math.random() * 12 + "px";
+      host.appendChild(bit);
+    }
+  }
+
   DogRace.UI = {
     show(name) {
       document.querySelectorAll(".screen").forEach((el) => el.classList.toggle("active", el.id === "screen-" + name));
@@ -110,12 +138,42 @@ window.DogRace = window.DogRace || {};
       $("menu-dog").alt = name;
       $("menu-dog-name").textContent = name;
       $("menu-dog-info").textContent = t("menu.levelInfo", { level: state.level, breed: dogBreed(dog) });
+      this.renderMenuGoal();
       this.refreshCoins();
+    },
+
+    renderMenuGoal() {
+      const host = $("menu-goal");
+      if (!host) return;
+      const next = DogRace.Save.nextMission();
+      if (!next) {
+        host.innerHTML = `<div class="goal-inner done"><span class="goal-icon">🎉</span><div><strong>${escapeHtml(t("ui.allMissionsDone"))}</strong><p>${escapeHtml(t("ui.keepRacing"))}</p></div></div>`;
+        return;
+      }
+      const m = next.mission;
+      const icon = m.icon || "🎯";
+      const hintKey = "mission." + m.id + ".hint";
+      const hint = t(hintKey) !== hintKey ? t(hintKey) : (m.hint || t("mission." + m.id + ".desc"));
+      const pct = missionProgressPct(next.progress, m.target);
+      const claimBtn = next.ready
+        ? `<button class="btn mint mini" data-go="missions">${escapeHtml(t("ui.claimReady"))}</button>`
+        : `<button class="btn ghost mini" data-go="missions">${escapeHtml(t("ui.viewMissions"))}</button>`;
+      host.innerHTML = `<div class="goal-inner ${next.ready ? "ready" : ""}">
+        <span class="goal-icon">${icon}</span>
+        <div class="goal-body">
+          <strong>${escapeHtml(t("ui.nextGoal"))}</strong>
+          <p>${escapeHtml(t("mission." + m.id + ".name"))}</p>
+          <small>${escapeHtml(hint)}</small>
+          <div class="goal-bar"><i style="width:${pct}%"></i></div>
+          <span class="goal-count">${next.progress}/${m.target}</span>
+        </div>
+        ${claimBtn}
+      </div>`;
     },
 
     renderDogs() {
       this.refreshCoins();
-      $("dogs-list").innerHTML = DogRace.Dogs.map((dog) => {
+      $("dogs-list-stack").innerHTML = DogRace.Dogs.map((dog) => {
         const state = DogRace.Save.dogState(dog.id);
         const stats = DogRace.Save.effectiveStats(dog.id);
         const rarity = DogRace.Rarity[dog.rarity];
@@ -213,35 +271,48 @@ window.DogRace = window.DogRace || {};
         const progress = DogRace.Save.missionProgress(m);
         const claimed = !!DogRace.Save.data.missionsClaimed[m.id];
         const ready = progress >= m.target && !claimed;
-        return `<article class="mission-card">
-          <div style="grid-column:1/-1">
-            <strong>${t("mission." + m.id + ".name")}</strong>
-            <p>${t("mission." + m.id + ".desc")} · ${progress}/${m.target}</p>
-            <div class="bars">${statBar(t("ui.goal"), (progress / m.target) * 16)}</div>
-            <button class="btn mint mini" data-claim-mission="${m.id}" ${ready ? "" : "disabled"}>${claimed ? t("ui.claimed") : "+" + m.rewardCoins + " 🪙"}</button>
+        const icon = m.icon || "🎯";
+        const hintKey = "mission." + m.id + ".hint";
+      const hint = t(hintKey) !== hintKey ? t(hintKey) : (m.hint || t("mission." + m.id + ".desc"));
+        const pct = missionProgressPct(progress, m.target);
+        return `<article class="mission-card ${claimed ? "claimed" : ready ? "ready" : ""}">
+          <div class="mission-icon">${icon}</div>
+          <div class="mission-body">
+            <strong>${escapeHtml(t("mission." + m.id + ".name"))}</strong>
+            <p class="mission-hint">${escapeHtml(hint)}</p>
+            <div class="goal-bar"><i style="width:${pct}%"></i></div>
+            <span class="goal-count">${progress}/${m.target}</span>
           </div>
+          <button class="btn ${ready ? "gold" : "mint"} mini" data-claim-mission="${m.id}" ${ready ? "" : "disabled"}>${claimed ? t("ui.claimed") : ready ? t("ui.claimNow") : "+" + m.rewardCoins + " 🪙"}</button>
         </article>`;
       }).join("");
       $("achieve-list").innerHTML = DogRace.Achievements.map((a) => {
         const have = DogRace.Save.data.stats[a.stat] || 0;
         const done = !!DogRace.Save.data.achievementsUnlocked[a.id] || have >= a.target;
-        return `<article class="mission-card ${done ? "" : "locked"}">
-          <div style="grid-column:1/-1">
-            <strong>${done ? "★ " : ""}${t("ach." + a.id + ".name")}</strong>
-            <p>${t("ach." + a.id + ".desc")}</p>
-            <div class="bars">${statBar(t("ui.progress"), (Math.min(have, a.target) / a.target) * 16)}</div>
+        const sticker = a.sticker || a.icon || "★";
+        const pct = missionProgressPct(Math.min(have, a.target), a.target);
+        return `<article class="mission-card sticker-card ${done ? "unlocked" : "locked"}">
+          <div class="mission-icon sticker">${done ? sticker : "🔒"}</div>
+          <div class="mission-body">
+            <strong>${escapeHtml(t("ach." + a.id + ".name"))}</strong>
+            <p class="mission-hint">${escapeHtml(t("ach." + a.id + ".desc"))}</p>
+            <div class="goal-bar"><i style="width:${pct}%"></i></div>
+            <span class="goal-count">${Math.min(have, a.target)}/${a.target}</span>
           </div>
+          ${done ? `<span class="sticker-badge">${escapeHtml(t("ui.unlocked"))}</span>` : ""}
         </article>`;
       }).join("");
     },
 
     renderTracks() {
       this.refreshCoins();
+      const practice = DogRace.Save.data.settings.kidMode;
       $("track-list").innerHTML = DogRace.Tracks.map((track) => {
         const unlocked = DogRace.Save.trackUnlocked(track);
-        return `<article class="track-card ${unlocked ? "" : "locked"}">
+        const isPractice = practice && track.id === "green_park";
+        return `<article class="track-card ${unlocked ? "" : "locked"} ${isPractice ? "practice" : ""}">
           <div style="grid-column:1/-1">
-            <h3>${escapeHtml(trackName(track))}</h3>
+            <h3>${escapeHtml(trackName(track))} ${isPractice ? '<span class="practice-tag">' + escapeHtml(t("ui.practice")) + "</span>" : ""}</h3>
             <p>${t("ui.trackMeta", { stars: track.stars, meters: track.lengthMeters, level: track.recommendedLevel })}</p>
             <p>${t("ui.aiRewards", { diff: t("diff." + track.aiDifficulty), mult: track.rewardMultiplier })}</p>
             ${trackRecordLine(track.id)}
@@ -257,6 +328,8 @@ window.DogRace = window.DogRace || {};
       $("set-music").checked = DogRace.Save.data.settings.music;
       $("set-sfx").checked = DogRace.Save.data.settings.sfx;
       $("set-vib").checked = DogRace.Save.data.settings.vibration;
+      const kid = $("set-kid");
+      if (kid) kid.checked = !!DogRace.Save.data.settings.kidMode;
       const nameEl = $("set-language-name");
       if (nameEl && DogRace.I18n) {
         const info = DogRace.I18n.info(DogRace.I18n.current());
@@ -292,24 +365,83 @@ window.DogRace = window.DogRace || {};
       $("hud-bar").style.width = Math.round(DogRace.progressOf(race, race.player) * 100) + "%";
       $("hud-coins").textContent = coinsLabel(race.player.coins);
       $("boost-meter").style.setProperty("--boost", Math.round(race.player.boostMeter * 100) + "%");
+      const boostBtn = $("btn-boost");
+      if (boostBtn) boostBtn.classList.toggle("hot", !!(race.player.boosting || race.player.boostLatched));
     },
 
     setCountdown(text) {
       $("countdown").textContent = text || "";
     },
 
+    showCoinFloat(amount) {
+      const el = $("coin-float");
+      if (!el) return;
+      el.textContent = "+" + amount + " 🪙";
+      el.classList.remove("hidden");
+      el.classList.remove("pop");
+      void el.offsetWidth;
+      el.classList.add("pop");
+      clearTimeout(el._timer);
+      el._timer = setTimeout(() => el.classList.add("hidden"), 700);
+    },
+
+    toast(message, icon) {
+      const stack = $("toast-stack");
+      if (!stack) return;
+      const el = document.createElement("div");
+      el.className = "toast";
+      el.innerHTML = `<span class="toast-icon">${icon || "🎉"}</span><span>${escapeHtml(message)}</span>`;
+      stack.appendChild(el);
+      requestAnimationFrame(() => el.classList.add("show"));
+      setTimeout(() => {
+        el.classList.remove("show");
+        setTimeout(() => el.remove(), 300);
+      }, 3200);
+    },
+
+    showStickers(achievements) {
+      if (!achievements || !achievements.length) return;
+      achievements.forEach((ach, i) => {
+        setTimeout(() => {
+          const sticker = ach.sticker || ach.icon || "★";
+          this.toast(t("ui.stickerUnlocked", { name: t("ach." + ach.id + ".name") }), sticker);
+        }, i * 400);
+      });
+    },
+
     renderResults(result, leveled) {
       const win = result.place === 1;
       const podium = result.place <= 3;
-      $("results-emoji").textContent = win ? "🏆" : podium ? "🥈" : "💨";
+      const stars = result.stars || (win ? 3 : podium ? 2 : 1);
+      const card = $("results-card");
+      $("results-emoji").textContent = win ? "🏆" : podium ? "🥈" : "🐾";
       $("results-title").textContent = win ? t("results.win") : podium ? t("results.great") : t("results.keep");
+      const cheer = $("results-cheer");
+      if (cheer) {
+        cheer.textContent = win
+          ? t("results.cheerWin")
+          : podium
+            ? t("results.cheerPodium")
+            : t("results.cheerTry");
+      }
       $("results-place").textContent = t("results.placeLine", { place: DogRace.placeOrdinal(result.place) });
+      const starsEl = $("results-stars");
+      if (starsEl) starsEl.innerHTML = starsHtml(stars);
       $("results-coins").textContent = result.totalCoins;
       $("results-xp").textContent = result.xp;
       $("results-picked-line").textContent = t("results.picked", { n: result.pickedCoins });
       $("results-level").classList.toggle("hidden", !leveled);
       const host = $("results-records");
       if (host) host.innerHTML = resultRecordBoxes(result);
+      if (card) {
+        card.classList.toggle("celebrate", win || podium);
+        card.classList.toggle("win", win);
+      }
+      const confetti = $("results-confetti");
+      if (confetti) {
+        if (win || podium) spawnConfetti(confetti, win ? 48 : 24);
+        else confetti.innerHTML = "";
+      }
     },
   };
 })();

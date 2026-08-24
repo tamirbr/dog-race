@@ -78,7 +78,7 @@ if (race.player.lane !== 0) throw new Error("Player did not stay in chosen lane"
 
 let guard = 240 + 45;
 while (race.phase !== "results" && guard < 20000) {
-  DR.stepRace(race, { laneDelta: guard % 180 === 0 ? 1 : 0, boost: guard % 90 < 20, jump: guard % 110 === 0 }, 1 / 60);
+  DR.stepRace(race, { laneDelta: guard % 180 === 0 ? 1 : 0, boostRequest: guard % 90 === 0, jump: guard % 110 === 0 }, 1 / 60);
   guard += 1;
 }
 if (race.phase !== "results") throw new Error("Race never finished");
@@ -90,7 +90,7 @@ if (DR.formatRaceTime(14.2) !== "14.2s") throw new Error("Short race time format
 if (DR.formatRaceTime(65.2) !== "1:05.2") throw new Error("Long race time format failed");
 if (DR.I18n.t("rec.score") !== "Score") throw new Error("Record strings missing");
 
-const leveled = DR.Save.applyRaceOutcome(race.results);
+const leveled = DR.Save.applyRaceOutcome(race.results).leveled;
 if (DR.Save.data.coins <= 0) throw new Error("Coins were not awarded");
 if (DR.Save.data.stats.racesFinished !== 1) throw new Error("Race stat missing");
 

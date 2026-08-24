@@ -110,6 +110,7 @@ window.DogRace = window.DogRace || {};
       finishPlace: 0,
       finishTime: 0,
       boosting: false,
+      boostLatched: false,
       wantBoost: false,
       boostMeter: motion.startBoost,
       stamina: 1,
@@ -254,7 +255,10 @@ window.DogRace = window.DogRace || {};
   function updateLocal(p, input) {
     if (input.laneDelta) p.lane = clampLane(p.lane + input.laneDelta);
     if (input.lane != null) p.lane = clampLane(input.lane);
-    p.wantBoost = !!input.boost;
+    if ((input.boostRequest || input.boost) && !p.boostLatched && p.boostMeter > 0) {
+      p.boostLatched = true;
+    }
+    p.wantBoost = p.boostLatched && p.boostMeter > 0;
     p.wantJump = !!input.jump;
   }
 
@@ -321,6 +325,7 @@ window.DogRace = window.DogRace || {};
       p.stun -= dt;
       p.speed = Math.max(30, p.speed - P.stunDecel * dt);
       p.boosting = false;
+      p.boostLatched = false;
       return;
     }
 
@@ -354,7 +359,10 @@ window.DogRace = window.DogRace || {};
         world.events.push({ type: "boost", who: p });
       }
     } else {
-      p.boostMeter = Math.min(1, p.boostMeter + P.boostIdleRegen * (0.7 + p.stats.stamina * 0.04) * dt);
+      if (p.boostLatched && p.boostMeter <= 0) p.boostLatched = false;
+      if (!p.boostLatched) {
+        p.boostMeter = Math.min(1, p.boostMeter + P.boostIdleRegen * (0.7 + p.stats.stamina * 0.04) * dt);
+      }
     }
 
     const offRoad = false;
@@ -401,7 +409,9 @@ window.DogRace = window.DogRace || {};
       if (item.taken) continue;
       const dz = item.z - p.z;
       if (dz < -8 || dz > 16) continue;
-      const sameLane = item.lane == null || item.lane < 0 ? Math.abs(item.x - laneX(p.lane)) < 0.28 : item.lane === p.lane;
+      const sameLane = item.lane == null || item.lane < 0
+        ? Math.abs(item.x - laneX(p.lane)) < (DogRace.Config.race.laneHitRadius || 0.28)
+        : item.lane === p.lane;
       if (!sameLane) continue;
 
       if (item.kind === "coin") {
@@ -409,6 +419,7 @@ window.DogRace = window.DogRace || {};
         p.coins += DogRace.Config.economy.coinPickupValue;
         world.events.push({ type: "coin", who: p, item });
       } else if (item.kind === "boost") {
+        if (p.boosting || p.boostLatched) continue;
         item.taken = true;
         p.boostMeter = Math.min(1, p.boostMeter + P.boostFillPickup);
         p.speed += 40;
@@ -485,9 +496,20 @@ window.DogRace = window.DogRace || {};
     return order;
   }
 
+  function raceDifficulty(trackDiff) {
+    const base = DogRace.Config.difficulty[trackDiff] || DogRace.Config.difficulty.normal;
+    if (!DogRace.Save || !DogRace.Save.data || !DogRace.Save.data.settings.kidMode) return base;
+    const km = DogRace.Config.kidMode || {};
+    return {
+      speed: base.speed * (km.aiSpeedMul || 0.88),
+      skill: base.skill * (km.aiSkillMul || 0.82),
+      label: base.label,
+    };
+  }
+
   DogRace.createRace = function ({ track, playerDogId, fieldSize }) {
     const course = DogRace.buildCourse(track);
-    const difficulty = DogRace.Config.difficulty[track.aiDifficulty] || DogRace.Config.difficulty.normal;
+    const difficulty = raceDifficulty(track.aiDifficulty);
     const player = createParticipant({
       id: "player",
       kind: Kind.LOCAL,
@@ -608,11 +630,15 @@ window.DogRace = window.DogRace || {};
   DogRace.buildResults = function (race) {
     const place = race.player.finishPlace;
     const eco = DogRace.Config.economy;
-    const placeCoins = Math.round((eco.placeCoins[place - 1] || 25) * race.track.rewardMultiplier);
+    const km = DogRace.Config.kidMode || {};
+    const kidMul = DogRace.Save && DogRace.Save.data && DogRace.Save.data.settings.kidMode ? (km.coinBonusMul || 1) : 1;
+    const placeCoins = Math.round((eco.placeCoins[place - 1] || 25) * race.track.rewardMultiplier * kidMul);
     const pickedCoins = race.player.coins;
     const xp = Math.round(((eco.placeXp[place - 1] || 20) + eco.finishXp) * race.track.rewardMultiplier);
+    const stars = place === 1 ? 3 : place <= 3 ? 2 : 1;
     return {
       place,
+      stars,
       field: race.participants.length,
       dogId: race.player.dogId,
       trackId: race.track.id,
