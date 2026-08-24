@@ -1,0 +1,11 @@
+{
+  "name": "dog-race",
+  "version": "1.0.0",
+  "private": true,
+  "description": "DOG RACE — colorful cartoon dog racing game",
+  "scripts": {
+    "start": "node tools/serve.mjs",
+    "assets": "node tools/process-images.mjs",
+    "sfx": "node tools/sfx.mjs"
+  }
+}

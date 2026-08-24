@@ -1,0 +1,9 @@
+<resources>
+    <style name="Theme.DogRace" parent="Theme.AppCompat.NoActionBar">
+        <item name="android:windowFullscreen">true</item>
+        <item name="android:windowContentOverlay">@null</item>
+        <item name="android:windowBackground">@color/splash_bg</item>
+        <item name="android:navigationBarColor">@color/splash_bg</item>
+        <item name="android:statusBarColor">@color/splash_bg</item>
+    </style>
+</resources>

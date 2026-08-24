@@ -1,0 +1,248 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <title>DOG RACE</title>
+  <link rel="stylesheet" href="css/game.css" />
+</head>
+<body>
+  <div id="app">
+    <section id="screen-splash" class="screen active">
+      <img class="splash-art" src="img/splash.png" alt="" />
+      <div class="splash-veil">
+        <img class="splash-icon" src="img/app_icon.png" alt="" />
+        <h1 data-i18n="brand.name">DOG RACE</h1>
+        <p class="tag" data-i18n="brand.tag">READY. SET. BARK!</p>
+      </div>
+    </section>
+
+    <section id="screen-tutorial" class="screen">
+      <div class="card tutorial-card">
+        <h2 data-i18n="tut.title">WELCOME TO DOG RACE!</h2>
+        <div class="scroller scroller-pane">
+          <ul class="tips">
+            <li><span>⬅️➡️</span> <i data-i18n="tut.swipe">Swipe left or right to change lanes</i></li>
+            <li><span>⬆️</span> <i data-i18n="tut.jump">Tap JUMP to leap over obstacles</i></li>
+            <li><span>⚡</span> <i data-i18n="tut.boost">Hold BOOST to go faster</i></li>
+            <li><span>🪙</span> <i data-i18n="tut.coins">Collect coins on the track</i></li>
+            <li><span>🏆</span> <i data-i18n="tut.win">Finish first to win big</i></li>
+          </ul>
+        </div>
+        <button class="btn gold" data-action="finish-tutorial" data-i18n="tut.start">LET'S RACE!</button>
+      </div>
+    </section>
+
+    <section id="screen-menu" class="screen menu-screen">
+      <div class="menu-bg"></div>
+      <header class="topbar">
+        <div class="brand">
+          <img src="img/app_icon.png" alt="" />
+          <div>
+            <strong data-i18n="brand.name">DOG RACE</strong>
+            <small id="menu-tag" data-i18n="brand.tag">READY. SET. BARK!</small>
+          </div>
+        </div>
+        <div class="topbar-tools">
+          <button class="btn mini" data-go="settings" data-i18n="nav.settings">SETTINGS</button>
+          <div class="coins" id="menu-coins">🪙 0</div>
+        </div>
+      </header>
+      <div class="menu-hero">
+        <button class="hero-dog" id="hero-dog" type="button">
+          <img id="menu-dog" src="img/buddy_portrait.png" alt="Buddy" />
+        </button>
+        <div class="hero-meta">
+          <h2 id="menu-dog-name">Buddy</h2>
+          <p id="menu-dog-info">Level 1 · Friendly Mix</p>
+        </div>
+      </div>
+      <nav class="menu-nav">
+        <button class="btn gold xl" data-go="tracks" data-i18n="nav.race">RACE</button>
+        <div class="menu-grid">
+          <button class="btn mint" data-go="dogs" data-i18n="nav.dogs">DOGS</button>
+          <button class="btn sky" data-go="upgrades" data-i18n="nav.upgrades">UPGRADES</button>
+          <button class="btn grape" data-go="shop" data-i18n="nav.shop">SHOP</button>
+          <button class="btn peach" data-go="missions" data-i18n="nav.missions">MISSIONS</button>
+        </div>
+      </nav>
+    </section>
+
+    <section id="screen-dogs" class="screen stack">
+      <header class="topbar">
+        <button class="btn mini" data-go="menu" data-i18n="nav.back">BACK</button>
+        <h2 data-i18n="title.kennel">KENNEL</h2>
+        <div class="coins" id="dogs-coins">🪙 0</div>
+      </header>
+      <div class="scroller" id="dogs-list"></div>
+    </section>
+
+    <section id="screen-upgrades" class="screen stack">
+      <header class="topbar">
+        <button class="btn mini" data-go="menu" data-i18n="nav.back">BACK</button>
+        <h2 data-i18n="title.upgrades">UPGRADES</h2>
+        <div class="coins" id="up-coins">🪙 0</div>
+      </header>
+      <div class="scroller">
+        <div class="card upgrade-hero">
+          <img id="up-portrait" src="img/buddy_portrait.png" alt="" />
+          <div>
+            <h3 id="up-name">Buddy</h3>
+            <p id="up-level">Level 1</p>
+            <div class="xp"><i id="up-xp"></i></div>
+          </div>
+        </div>
+        <div class="scroller-stack" id="upgrade-list"></div>
+      </div>
+    </section>
+
+    <section id="screen-shop" class="screen stack">
+      <header class="topbar">
+        <button class="btn mini" data-go="menu" data-i18n="nav.back">BACK</button>
+        <h2 data-i18n="title.shop">SHOP</h2>
+        <div class="coins" id="shop-coins">🪙 0</div>
+      </header>
+      <div class="scroller">
+        <div class="card daily" id="daily-card"></div>
+        <div class="scroller-stack" id="shop-list"></div>
+      </div>
+    </section>
+
+    <section id="screen-missions" class="screen stack">
+      <header class="topbar">
+        <button class="btn mini" data-go="menu" data-i18n="nav.back">BACK</button>
+        <h2 data-i18n="title.missions">MISSIONS</h2>
+        <div class="coins" id="mission-coins">🪙 0</div>
+      </header>
+      <div class="scroller">
+        <div class="scroller-stack" id="mission-list"></div>
+        <h3 class="subhead" data-i18n="title.achievements">Achievements</h3>
+        <div class="scroller-stack" id="achieve-list"></div>
+      </div>
+    </section>
+
+    <section id="screen-settings" class="screen stack">
+      <header class="topbar">
+        <button class="btn mini" data-go="menu" data-i18n="nav.back">BACK</button>
+        <h2 data-i18n="title.settings">SETTINGS</h2>
+        <span></span>
+      </header>
+      <div class="scroller">
+        <div class="card settings-card">
+          <label class="toggle">
+            <span data-i18n="set.music">Music</span>
+            <input id="set-music" type="checkbox" />
+            <i class="switch" aria-hidden="true"></i>
+          </label>
+          <label class="toggle">
+            <span data-i18n="set.sfx">Sound Effects</span>
+            <input id="set-sfx" type="checkbox" />
+            <i class="switch" aria-hidden="true"></i>
+          </label>
+          <label class="toggle">
+            <span data-i18n="set.vibration">Vibration</span>
+            <input id="set-vib" type="checkbox" />
+            <i class="switch" aria-hidden="true"></i>
+          </label>
+          <button type="button" class="lang-open" id="set-language" data-action="language-open">
+            <span data-i18n="set.language">Language</span>
+            <strong id="set-language-name">English</strong>
+          </button>
+        </div>
+      </div>
+    </section>
+
+    <section id="screen-tracks" class="screen stack">
+      <header class="topbar">
+        <button class="btn mini" data-go="menu" data-i18n="nav.back">BACK</button>
+        <h2 data-i18n="title.tracks">CHOOSE TRACK</h2>
+        <div class="coins" id="track-coins">🪙 0</div>
+      </header>
+      <div class="scroller scroller-grid" id="track-list"></div>
+    </section>
+
+    <section id="screen-race" class="screen race-screen">
+      <canvas id="race-canvas"></canvas>
+      <div class="hud">
+        <div class="hud-top">
+          <div class="hud-pill" id="hud-place">1st / 5</div>
+          <div class="hud-progress"><i id="hud-bar"></i></div>
+          <div class="hud-right">
+            <div class="hud-pill" id="hud-coins">🪙 0</div>
+            <button class="btn mini pause" id="btn-pause">❚❚</button>
+          </div>
+        </div>
+        <div class="countdown" id="countdown"></div>
+        <button class="action jump" id="btn-jump" type="button">
+          <span>⬆️</span>
+          <b data-i18n="hud.jump">JUMP</b>
+        </button>
+        <button class="boost" id="btn-boost">
+          <img src="img/boost_btn.png" data-i18n-alt="hud.boost" alt="Boost" />
+          <b data-i18n="hud.boost">BOOST</b>
+          <i id="boost-meter"></i>
+        </button>
+      </div>
+      <div class="overlay hidden" id="pause-overlay">
+        <div class="card">
+          <h2 data-i18n="pause.title">PAUSED</h2>
+          <button class="btn gold" data-action="resume" data-i18n="pause.resume">RESUME</button>
+          <button class="btn ghost" data-action="quit-race" data-i18n="pause.quit">QUIT</button>
+        </div>
+      </div>
+    </section>
+
+    <section id="screen-results" class="screen results-screen">
+      <div class="card results-card">
+        <div class="trophy" id="results-emoji">🏆</div>
+        <h2 id="results-title">YOU WIN!</h2>
+        <p class="place" id="results-place">1st</p>
+        <div class="rewards">
+          <div>+<span id="results-coins">0</span> 🪙</div>
+          <div>+<span id="results-xp">0</span> XP</div>
+          <div class="muted" id="results-picked-line">Track coins +0</div>
+        </div>
+        <div class="records" id="results-records"></div>
+        <p class="levelup hidden" id="results-level" data-i18n="results.levelUp">LEVEL UP!</p>
+        <div class="row">
+          <button class="btn gold" data-action="again" data-i18n="results.again">RACE AGAIN</button>
+          <button class="btn mint" data-go="upgrades" data-i18n="results.upgrade">UPGRADE</button>
+        </div>
+        <button class="btn ghost" data-go="menu" data-i18n="results.continue">CONTINUE</button>
+      </div>
+    </section>
+  </div>
+
+  <div class="confirm hidden" id="rename-dog">
+    <div class="card">
+      <h3 data-i18n="rename.title">Name your dog</h3>
+      <p id="rename-hint">Give your pup a new name!</p>
+      <input id="rename-input" class="name-input" maxlength="16" autocomplete="off" enterkeyhint="done" />
+      <div class="row">
+        <button class="btn gold" data-action="rename-save" data-i18n="rename.save">SAVE</button>
+        <button class="btn ghost" data-action="rename-cancel" data-i18n="rename.cancel">CANCEL</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="confirm hidden" id="lang-picker">
+    <div class="card">
+      <h3 data-i18n="lang.title">Language</h3>
+      <div class="scroller scroller-pane scroller-grid" id="lang-list"></div>
+      <button class="btn ghost" data-action="language-close" data-i18n="lang.close">CLOSE</button>
+    </div>
+  </div>
+
+  <script src="js/config.js"></script>
+  <script src="js/data.js"></script>
+  <script src="js/i18n.js"></script>
+  <script src="js/i18n-extra.js"></script>
+  <script src="js/save.js"></script>
+  <script src="js/audio.js"></script>
+  <script src="js/race.js"></script>
+  <script src="js/render.js"></script>
+  <script src="js/ui.js"></script>
+  <script src="js/app.js"></script>
+</body>
+</html>
