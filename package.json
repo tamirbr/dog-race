@@ -5,7 +5,11 @@
   "description": "DOG RACE — colorful cartoon dog racing game",
   "scripts": {
     "start": "node tools/serve.mjs",
+    "server": "npm --prefix server start",
+    "server:install": "npm --prefix server install",
+    "dev": "npm run server:install && node tools/dev.mjs",
     "assets": "node tools/process-images.mjs",
-    "sfx": "node tools/sfx.mjs"
+    "sfx": "node tools/sfx.mjs",
+    "smoke": "node tools/smoke.mjs"
   }
 }

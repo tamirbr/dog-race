@@ -131,4 +131,12 @@ DogRace.Config = {
   },
 
   saveKey: "dograce.save.v1",
+
+  multiplayer: {
+    backendUrl: null,
+    probeIntervalMs: 30000,
+    probeTimeoutMs: 2500,
+    syncIntervalMs: 100,
+    positionLerp: 12,
+  },
 };

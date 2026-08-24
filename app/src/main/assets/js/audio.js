@@ -98,6 +98,7 @@ window.DogRace = window.DogRace || {};
     setTheme(theme, force) {
       currentTheme = theme === "race" ? "race" : "lobby";
       if (!unlocked) return;
+      if (this._bgPaused) return;
       if (!musicEnabled()) {
         this.stopMusic();
         return;
@@ -128,6 +129,16 @@ window.DogRace = window.DogRace || {};
       });
     },
 
+    pauseForBackground() {
+      this._bgPaused = true;
+      this.stopMusic();
+    },
+
+    resumeFromBackground() {
+      this._bgPaused = false;
+      if (unlocked && musicEnabled()) this.setTheme(currentTheme, true);
+    },
+
     setMusicEnabled(on) {
       DogRace.Save.data.settings.music = on;
       DogRace.Save.persist();
@@ -144,4 +155,9 @@ window.DogRace = window.DogRace || {};
       if (navigator.vibrate) navigator.vibrate(ms);
     },
   };
+
+  document.addEventListener("visibilitychange", () => {
+    if (document.hidden) DogRace.Audio.pauseForBackground();
+    else DogRace.Audio.resumeFromBackground();
+  });
 })();

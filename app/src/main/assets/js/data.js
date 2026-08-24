@@ -116,6 +116,8 @@ DogRace.Dogs = [
     raceSprite: "img/buddy_back.png",
     sideSprite: "img/buddy_run.png",
     accent: "#F97316",
+    variantHue: 28,
+    variantSat: 1.15,
   },
   {
     id: "coco",
@@ -135,6 +137,8 @@ DogRace.Dogs = [
     raceSprite: "img/luna_back.png",
     sideSprite: "img/luna_run.png",
     accent: "#EC4899",
+    variantHue: -35,
+    variantSat: 1.2,
   },
   {
     id: "bolt",
@@ -154,6 +158,8 @@ DogRace.Dogs = [
     raceSprite: "img/zara_back.png",
     sideSprite: "img/zara_run.png",
     accent: "#FBBF24",
+    variantHue: 42,
+    variantSat: 1.1,
   },
 ];
 
