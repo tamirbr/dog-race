@@ -187,15 +187,20 @@
         <div class="card mp-card hidden" id="mp-invite-banner">
           <p id="mp-invite-text"></p>
           <div class="row">
-            <button class="btn gold mini" data-mp-action="accept-invite" data-i18n="mp.acceptInvite">JOIN</button>
-            <button class="btn ghost mini" data-mp-action="dismiss-invite" data-i18n="mp.dismiss">DISMISS</button>
+            <button class="btn gold mini" data-mp-action="accept-invite" data-i18n="mp.acceptInvite">ACCEPT</button>
+            <button class="btn ghost mini" data-mp-action="decline-invite" data-i18n="mp.declineInvite">DECLINE</button>
           </div>
+        </div>
+        <div class="card mp-card">
+          <h3 data-i18n="mp.friendRequests">Friend requests</h3>
+          <div id="mp-requests-incoming" class="mp-friends"></div>
+          <div id="mp-requests-outgoing" class="mp-friends"></div>
         </div>
         <div class="card mp-card">
           <h3 data-i18n="mp.friends">Friends</h3>
           <div class="row mp-nick-row">
             <input id="mp-friend-input" class="name-input" maxlength="16" placeholder="nickname" data-i18n-placeholder="mp.friendPlaceholder" />
-            <button class="btn sky mini" data-mp-action="add-friend" data-i18n="mp.addFriend">ADD</button>
+            <button class="btn sky mini" data-mp-action="request-friend" data-i18n="mp.sendRequest">REQUEST</button>
           </div>
           <div id="mp-friends-list" class="mp-friends"></div>
         </div>
@@ -223,6 +228,10 @@
         <div class="card mp-card">
           <h3 data-i18n="mp.players">Players</h3>
           <div id="lobby-players" class="lobby-players"></div>
+        </div>
+        <div class="card mp-card" id="lobby-invite-friends">
+          <h3 data-i18n="mp.inviteFriends">Invite friends</h3>
+          <div id="lobby-friends-list" class="mp-friends"></div>
         </div>
         <div class="card mp-card mp-actions" id="lobby-host-controls">
           <button class="btn sky mini" data-mp-action="lobby-add-bot" data-i18n="mp.addBot">+ BOT</button>

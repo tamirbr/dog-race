@@ -8,20 +8,28 @@ import {
   MATCH_QUEUE_MIN_HUMANS,
   TRACK_IDS,
   addBotToLobby,
-  addFriend,
   addHumanToLobby,
+  areFriends,
+  acceptFriendRequest,
+  cancelFriendRequest,
+  clearLobbyInvite,
+  clearLobbyInvitesForLobby,
   createLobby,
+  createLobbyInvite,
   createPlayer,
+  declineFriendRequest,
   deleteLobby,
   ensureHost,
   fillBots,
   findByNickname,
   findPlayerSlot,
   getLobby,
+  getLobbyInvite,
   getMatchQueue,
   getPlayer,
   joinMatchQueue,
   leaveMatchQueue,
+  listFriendRequests,
   listFriends,
   lobbyHumans,
   lobbyPlayerCount,
@@ -33,6 +41,7 @@ import {
   removePlayer,
   renamePlayer,
   restoreByToken,
+  sendFriendRequest,
   serializeLobby,
   stats,
   pickRandomTrack,
@@ -80,6 +89,16 @@ function emitFriends(player) {
   io.to(player.id).emit("friends:list", listFriends(player));
 }
 
+function emitFriendRequests(player) {
+  io.to(player.id).emit("friends:requests", listFriendRequests(player));
+}
+
+function emitFriendRequestNotice(target, from) {
+  io.to(target.id).emit("friends:request", {
+    from: publicPlayer(from),
+  });
+}
+
 function leaveLobby(player, notify = true) {
   if (!player?.lobbyId) return;
   const lobby = getLobby(player.lobbyId);
@@ -90,6 +109,7 @@ function leaveLobby(player, notify = true) {
   }
   removeFromLobby(lobby, player.id);
   if (!lobby.slots.length) {
+    clearLobbyInvitesForLobby(lobby.id);
     deleteLobby(lobby.id);
     return;
   }
@@ -220,6 +240,11 @@ io.on("connection", (socket) => {
   }
 
   socket.emit("friends:list", listFriends(player));
+  socket.emit("friends:requests", listFriendRequests(player));
+  const pendingLobbyInvite = getLobbyInvite(player.id);
+  if (pendingLobbyInvite) {
+    socket.emit("lobby:invite", pendingLobbyInvite);
+  }
 
   socket.on("nickname:rename", (name, cb) => {
     const res = renamePlayer(player, name);
@@ -246,12 +271,49 @@ io.on("connection", (socket) => {
     cb?.({ ok: true, dogId: player.dogId });
   });
 
-  socket.on("friends:add", (nickname, cb) => {
-    const res = addFriend(player, nickname);
+  socket.on("friends:request", (nickname, cb) => {
+    const res = sendFriendRequest(player, nickname);
+    if (res.ok) {
+      emitFriendRequests(player);
+      const target = findByNickname(nickname);
+      if (target) {
+        emitFriendRequests(target);
+        emitFriendRequestNotice(target, player);
+      }
+    }
+    cb?.(res);
+  });
+
+  socket.on("friends:accept", (fromId, cb) => {
+    const res = acceptFriendRequest(player, fromId);
     if (res.ok) {
       emitFriends(player);
-      const other = findByNickname(nickname);
-      if (other) emitFriends(other);
+      emitFriendRequests(player);
+      const from = getPlayer(fromId);
+      if (from) {
+        emitFriends(from);
+        emitFriendRequests(from);
+      }
+    }
+    cb?.(res);
+  });
+
+  socket.on("friends:decline", (fromId, cb) => {
+    const res = declineFriendRequest(player, fromId);
+    if (res.ok) {
+      emitFriendRequests(player);
+      const from = getPlayer(fromId);
+      if (from) emitFriendRequests(from);
+    }
+    cb?.(res);
+  });
+
+  socket.on("friends:cancel", (targetId, cb) => {
+    const res = cancelFriendRequest(player, targetId);
+    if (res.ok) {
+      emitFriendRequests(player);
+      const target = getPlayer(targetId);
+      if (target) emitFriendRequests(target);
     }
     cb?.(res);
   });
@@ -301,18 +363,60 @@ io.on("connection", (socket) => {
     cb?.({ ok: true });
   });
 
-  socket.on("lobby:invite", (nickname, cb) => {
+  socket.on("lobby:invite", (friendId, cb) => {
     const lobby = getLobby(player.lobbyId);
     if (!lobby || lobby.hostId !== player.id) {
       return cb?.({ ok: false, error: "not_host" });
     }
-    const target = findByNickname(nickname);
+    if (lobby.state !== "waiting") return cb?.({ ok: false, error: "in_progress" });
+    const target = getPlayer(friendId);
     if (!target) return cb?.({ ok: false, error: "not_found" });
-    io.to(target.id).emit("lobby:invite", {
-      from: player.nickname,
+    if (!areFriends(player, target)) return cb?.({ ok: false, error: "not_friend" });
+    if (findPlayerSlot(lobby, target.id)) return cb?.({ ok: false, error: "already_in_lobby" });
+    const invite = {
       lobbyId: lobby.id,
+      fromId: player.id,
+      from: player.nickname,
       trackId: lobby.trackId,
-    });
+    };
+    createLobbyInvite(target, lobby, player);
+    io.to(target.id).emit("lobby:invite", invite);
+    cb?.({ ok: true, invite });
+  });
+
+  socket.on("lobby:acceptInvite", (lobbyId, cb) => {
+    const invite = getLobbyInvite(player.id);
+    if (!invite || invite.lobbyId !== lobbyId) return cb?.({ ok: false, error: "no_invite" });
+    leaveMatchQueue(player);
+    leaveLobby(player, false);
+    const lobby = getLobby(lobbyId);
+    if (!lobby) {
+      clearLobbyInvite(player.id, lobbyId);
+      return cb?.({ ok: false, error: "not_found" });
+    }
+    if (lobby.state !== "waiting") {
+      clearLobbyInvite(player.id, lobbyId);
+      return cb?.({ ok: false, error: "in_progress" });
+    }
+    const res = addHumanToLobby(lobby, player);
+    if (!res.ok) return cb?.(res);
+    clearLobbyInvite(player.id, lobbyId);
+    socket.join(lobby.id);
+    emitLobby(lobby);
+    cb?.({ ok: true, lobby: serializeLobby(lobby, player.id) });
+  });
+
+  socket.on("lobby:declineInvite", (lobbyId, cb) => {
+    const invite = getLobbyInvite(player.id);
+    if (!invite || invite.lobbyId !== lobbyId) return cb?.({ ok: false, error: "no_invite" });
+    clearLobbyInvite(player.id, lobbyId);
+    const host = getPlayer(invite.fromId);
+    if (host) {
+      io.to(host.id).emit("lobby:inviteDeclined", {
+        lobbyId,
+        nickname: player.nickname,
+      });
+    }
     cb?.({ ok: true });
   });
 

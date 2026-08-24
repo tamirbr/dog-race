@@ -373,12 +373,33 @@ window.DogRace = window.DogRace || {};
         DogRace.Audio.play("pickup");
       } else DogRace.UI.toast(DogRace.I18n.t("mp.nameTaken"), "⚠️");
     }
-    if (action === "add-friend") {
-      const res = await mp.addFriend($("mp-friend-input").value);
+    if (action === "request-friend") {
+      const res = await mp.requestFriend($("mp-friend-input").value);
       if (res.ok) {
         $("mp-friend-input").value = "";
-        DogRace.UI.toast(DogRace.I18n.t("mp.friendAdded"), "🐾");
+        DogRace.UI.toast(DogRace.I18n.t("mp.requestSent"), "📨");
+        DogRace.UI.renderMpFriendRequests();
+      } else if (res.error === "already_friends") {
+        DogRace.UI.toast(DogRace.I18n.t("mp.alreadyFriends"), "🐾");
+      } else if (res.error === "already_sent") {
+        DogRace.UI.toast(DogRace.I18n.t("mp.requestPending"), "⏳");
       } else DogRace.UI.toast(DogRace.I18n.t("mp.friendNotFound"), "❓");
+    }
+    if (action === "accept-friend") {
+      const res = await mp.acceptFriendRequest(btn.dataset.from);
+      if (res.ok) {
+        DogRace.UI.toast(DogRace.I18n.t("mp.friendAdded"), "🐾");
+        DogRace.UI.renderMpFriendRequests();
+        DogRace.UI.renderMpFriends();
+      }
+    }
+    if (action === "decline-friend") {
+      await mp.declineFriendRequest(btn.dataset.from);
+      DogRace.UI.renderMpFriendRequests();
+    }
+    if (action === "cancel-friend") {
+      await mp.cancelFriendRequest(btn.dataset.to);
+      DogRace.UI.renderMpFriendRequests();
     }
     if (action === "create-lobby") {
       const res = await mp.createLobby("green_park");
@@ -396,18 +417,18 @@ window.DogRace = window.DogRace || {};
     }
     if (action === "accept-invite") {
       const res = await mp.acceptInvite();
-      DogRace.UI.hideMpInvite();
       if (res.ok) go("lobby");
+      else DogRace.UI.toast(DogRace.I18n.t("mp.error"), "⚠️");
     }
-    if (action === "dismiss-invite") DogRace.UI.hideMpInvite();
-    if (action === "join-friend") {
-      const res = await mp.joinFriendLobby(btn.dataset.friend);
-      if (res.ok) go("lobby");
-      else DogRace.UI.toast(DogRace.I18n.t("mp.noLobby"), "🚪");
+    if (action === "decline-invite") {
+      await mp.declineInvite();
+      DogRace.UI.hideMpInvite();
     }
     if (action === "invite-friend") {
-      const res = await mp.inviteFriend(btn.dataset.friend);
+      const res = await mp.inviteFriend(btn.dataset.friendId);
       if (res.ok) DogRace.UI.toast(DogRace.I18n.t("mp.inviteSent"), "📨");
+      else if (res.error === "not_friend") DogRace.UI.toast(DogRace.I18n.t("mp.notFriend"), "⚠️");
+      else DogRace.UI.toast(DogRace.I18n.t("mp.error"), "⚠️");
     }
     if (action === "quit-lobby") {
       await mp.quitLobbyAndMenu();

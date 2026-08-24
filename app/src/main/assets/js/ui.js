@@ -459,8 +459,48 @@ window.DogRace = window.DogRace || {};
 
     renderMultiplayerHub() {
       this.setMpNickname($("mp-nickname-input")?.value || "");
+      this.renderMpFriendRequests();
       this.renderMpFriends();
       this.renderMpQueue({ waiting: DogRace.Multiplayer && DogRace.Multiplayer.isQueueWaiting() });
+    },
+
+    renderMpFriendRequests() {
+      const mp = DogRace.Multiplayer;
+      if (!mp) return;
+      const data = mp.getFriendRequests() || { incoming: [], outgoing: [] };
+      const incomingHost = $("mp-requests-incoming");
+      const outgoingHost = $("mp-requests-outgoing");
+      if (incomingHost) {
+        if (!data.incoming.length) {
+          incomingHost.innerHTML = `<p class="muted mp-empty">${escapeHtml(t("mp.noIncoming"))}</p>`;
+        } else {
+          incomingHost.innerHTML = data.incoming
+            .map(
+              (r) => `<div class="mp-friend-row pending">
+                <div><strong>${escapeHtml(r.nickname)}</strong><small>${escapeHtml(t("mp.incomingRequest"))}</small></div>
+                <div class="row">
+                  <button class="btn mint mini" data-mp-action="accept-friend" data-from="${escapeHtml(r.id)}">${escapeHtml(t("mp.accept"))}</button>
+                  <button class="btn ghost mini" data-mp-action="decline-friend" data-from="${escapeHtml(r.id)}">${escapeHtml(t("mp.decline"))}</button>
+                </div>
+              </div>`
+            )
+            .join("");
+        }
+      }
+      if (outgoingHost) {
+        if (!data.outgoing.length) {
+          outgoingHost.innerHTML = `<p class="muted mp-empty">${escapeHtml(t("mp.noOutgoing"))}</p>`;
+        } else {
+          outgoingHost.innerHTML = data.outgoing
+            .map(
+              (r) => `<div class="mp-friend-row pending">
+                <div><strong>${escapeHtml(r.nickname)}</strong><small>${escapeHtml(t("mp.outgoingRequest"))}</small></div>
+                <button class="btn ghost mini" data-mp-action="cancel-friend" data-to="${escapeHtml(r.id)}">${escapeHtml(t("mp.cancel"))}</button>
+              </div>`
+            )
+            .join("");
+        }
+      }
     },
 
     renderMpFriends() {
@@ -474,13 +514,46 @@ window.DogRace = window.DogRace || {};
       host.innerHTML = friends
         .map((f) => {
           const status = f.status === "lobby" ? t("mp.inLobby") : f.status === "racing" ? t("mp.racing") : f.online ? t("mp.online") : t("mp.offline");
-          const joinBtn =
-            f.status === "lobby" && f.lobbyId
-              ? `<button class="btn mint mini" data-mp-action="join-friend" data-friend="${escapeHtml(f.nickname)}">${escapeHtml(t("mp.join"))}</button>`
-              : "";
           return `<div class="mp-friend-row">
             <div><strong>${escapeHtml(f.nickname)}</strong><small>${escapeHtml(status)}</small></div>
-            <div class="row">${joinBtn}<button class="btn ghost mini" data-mp-action="invite-friend" data-friend="${escapeHtml(f.nickname)}">${escapeHtml(t("mp.invite"))}</button></div>
+          </div>`;
+        })
+        .join("");
+    },
+
+    renderLobbyFriends(declinedNickname) {
+      const host = $("lobby-friends-list");
+      const section = $("lobby-invite-friends");
+      const lobby = DogRace.Multiplayer && DogRace.Multiplayer.getLobby();
+      if (!host || !section || !lobby) return;
+      if (!lobby.isHost) {
+        section.classList.add("hidden");
+        return;
+      }
+      section.classList.remove("hidden");
+      const friends = DogRace.Multiplayer.getFriends();
+      if (!friends.length) {
+        host.innerHTML = `<p class="muted mp-empty">${escapeHtml(t("mp.noFriends"))}</p>`;
+        return;
+      }
+      const inLobby = new Set((lobby.slots || []).map((s) => s.id));
+      host.innerHTML = friends
+        .map((f) => {
+          const inAlready = inLobby.has(f.id);
+          const declined = declinedNickname === f.nickname;
+          const status = declined
+            ? t("mp.declinedInvite")
+            : inAlready
+              ? t("mp.inLobby")
+              : f.online
+                ? t("mp.online")
+                : t("mp.offline");
+          const inviteBtn = inAlready
+            ? `<button class="btn mini" disabled>${escapeHtml(t("mp.inLobby"))}</button>`
+            : `<button class="btn sky mini" data-mp-action="invite-friend" data-friend-id="${escapeHtml(f.id)}">${escapeHtml(t("mp.invite"))}</button>`;
+          return `<div class="mp-friend-row ${declined ? "declined" : ""}">
+            <div><strong>${escapeHtml(f.nickname)}</strong><small>${escapeHtml(status)}</small></div>
+            ${inviteBtn}
           </div>`;
         })
         .join("");
@@ -555,6 +628,7 @@ window.DogRace = window.DogRace || {};
       }
       const stateEl = $("lobby-state");
       if (stateEl) stateEl.textContent = lobby.state === "racing" ? t("mp.racing") : t("mp.waiting");
+      this.renderLobbyFriends();
     },
 
     onLobbyLeft() {

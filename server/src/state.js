@@ -18,6 +18,9 @@ const nicknames = new Map();
 const lobbies = new Map();
 const matchQueue = new Set();
 const reconnectTokens = new Map();
+const friendRequestsOutgoing = new Map();
+const friendRequestsIncoming = new Map();
+const lobbyInvites = new Map();
 
 let botCounter = 0;
 
@@ -95,6 +98,11 @@ export function removePlayer(socketId) {
   reconnectTokens.delete(player.reconnectToken);
   players.delete(socketId);
   matchQueue.delete(socketId);
+  friendRequestsOutgoing.delete(socketId);
+  friendRequestsIncoming.delete(socketId);
+  lobbyInvites.delete(socketId);
+  for (const set of friendRequestsOutgoing.values()) set.delete(socketId);
+  for (const set of friendRequestsIncoming.values()) set.delete(socketId);
   return player;
 }
 
@@ -115,17 +123,78 @@ export function rebindSocket(oldId, newSocketId, player) {
   return player;
 }
 
+function outgoingSet(playerId) {
+  if (!friendRequestsOutgoing.has(playerId)) friendRequestsOutgoing.set(playerId, new Set());
+  return friendRequestsOutgoing.get(playerId);
+}
+
+function incomingSet(playerId) {
+  if (!friendRequestsIncoming.has(playerId)) friendRequestsIncoming.set(playerId, new Set());
+  return friendRequestsIncoming.get(playerId);
+}
+
+export function areFriends(a, b) {
+  if (!a || !b) return false;
+  return a.friends.has(b.id);
+}
+
 export function listFriends(player) {
   return [...player.friends].map((fid) => publicPlayer(players.get(fid))).filter(Boolean);
 }
 
-export function addFriend(player, targetNickname) {
+export function listFriendRequests(player) {
+  const incoming = [...incomingSet(player.id)].map((fromId) => {
+    const from = players.get(fromId);
+    return from ? { id: from.id, nickname: from.nickname } : null;
+  }).filter(Boolean);
+  const outgoing = [...outgoingSet(player.id)].map((toId) => {
+    const to = players.get(toId);
+    return to ? { id: to.id, nickname: to.nickname } : null;
+  }).filter(Boolean);
+  return { incoming, outgoing };
+}
+
+export function sendFriendRequest(player, targetNickname) {
   const target = findByNickname(targetNickname);
   if (!target) return { ok: false, error: "not_found" };
   if (target.id === player.id) return { ok: false, error: "self" };
-  player.friends.add(target.id);
-  target.friends.add(player.id);
-  return { ok: true, friend: publicPlayer(target) };
+  if (areFriends(player, target)) return { ok: false, error: "already_friends" };
+  if (incomingSet(player.id).has(target.id)) {
+    return { ok: false, error: "incoming_pending", from: publicPlayer(target) };
+  }
+  if (outgoingSet(player.id).has(target.id)) return { ok: false, error: "already_sent" };
+  outgoingSet(player.id).add(target.id);
+  incomingSet(target.id).add(player.id);
+  return { ok: true, to: publicPlayer(target) };
+}
+
+export function acceptFriendRequest(player, fromId) {
+  const from = players.get(fromId);
+  if (!from) return { ok: false, error: "not_found" };
+  if (!incomingSet(player.id).has(fromId)) return { ok: false, error: "no_request" };
+  incomingSet(player.id).delete(fromId);
+  outgoingSet(fromId).delete(player.id);
+  player.friends.add(from.id);
+  from.friends.add(player.id);
+  return { ok: true, friend: publicPlayer(from) };
+}
+
+export function declineFriendRequest(player, fromId) {
+  const from = players.get(fromId);
+  if (!from) return { ok: false, error: "not_found" };
+  if (!incomingSet(player.id).has(fromId)) return { ok: false, error: "no_request" };
+  incomingSet(player.id).delete(fromId);
+  outgoingSet(fromId).delete(player.id);
+  return { ok: true, from: publicPlayer(from) };
+}
+
+export function cancelFriendRequest(player, targetId) {
+  const target = players.get(targetId);
+  if (!target) return { ok: false, error: "not_found" };
+  if (!outgoingSet(player.id).has(targetId)) return { ok: false, error: "no_request" };
+  outgoingSet(player.id).delete(targetId);
+  incomingSet(targetId).delete(player.id);
+  return { ok: true, to: publicPlayer(target) };
 }
 
 export function removeFriend(player, friendId) {
@@ -133,6 +202,31 @@ export function removeFriend(player, friendId) {
   const other = players.get(friendId);
   if (other) other.friends.delete(player.id);
   return { ok: true };
+}
+
+export function createLobbyInvite(target, lobby, host) {
+  lobbyInvites.set(target.id, {
+    lobbyId: lobby.id,
+    fromId: host.id,
+    from: host.nickname,
+    trackId: lobby.trackId,
+    createdAt: Date.now(),
+  });
+}
+
+export function getLobbyInvite(targetId) {
+  return lobbyInvites.get(targetId) || null;
+}
+
+export function clearLobbyInvite(targetId, lobbyId) {
+  const invite = lobbyInvites.get(targetId);
+  if (invite && (!lobbyId || invite.lobbyId === lobbyId)) lobbyInvites.delete(targetId);
+}
+
+export function clearLobbyInvitesForLobby(lobbyId) {
+  for (const [targetId, invite] of lobbyInvites.entries()) {
+    if (invite.lobbyId === lobbyId) lobbyInvites.delete(targetId);
+  }
 }
 
 function nextBotName() {

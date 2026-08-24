@@ -39,7 +39,8 @@ Default port: **3001**. Health check: `GET http://localhost:3001/health`
 |-----------------|-----------------|
 | `nickname:rename` | `session:new`, `session:restored` |
 | `dog:set` | `friends:list` |
-| `friends:add`, `friends:remove`, `friends:search` | `lobby:update`, `lobby:invite`, `lobby:kicked` |
+| `friends:request`, `friends:accept`, `friends:decline`, `friends:cancel` | `friends:list`, `friends:requests`, `friends:request` |
+| `lobby:invite` (friend id), `lobby:acceptInvite`, `lobby:declineInvite` | `lobby:update`, `lobby:invite`, `lobby:inviteDeclined` |
 | `lobby:create`, `lobby:join`, `lobby:leave`, `lobby:invite` | `queue:status` |
 | `lobby:setTrack`, `lobby:addBot`, `lobby:removeBot`, `lobby:kick` | `race:start`, `race:rejoin` |
 | `lobby:ready`, `lobby:start` | `race:peer` |
@@ -61,5 +62,6 @@ Point the game client at your server URL (see root README).
 1. Start server: `npm start` in `server/`
 2. Start game: `npm start` in repo root
 3. Open two browser tabs to `http://localhost:4173`
-4. Multiplayer button appears when `/health` responds
-5. Create lobby in tab 1, join from tab 2 (or use matchmaking)
+4. **Friend requests:** Tab A → Multiplayer → enter B's nickname → **REQUEST**. Tab B sees pending request → **ACCEPT**. Both lists show the friend.
+5. **Lobby invites:** Tab A → Create Lobby → Invite friends section → **INVITE** next to B. Tab B gets banner → **ACCEPT** → appears in lobby.
+6. Automated 2-client test: `npm run test:social` in `server/`

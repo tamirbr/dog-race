@@ -12,6 +12,7 @@ window.DogRace = window.DogRace || {};
   let syncTimer = null;
   let lobby = null;
   let friends = [];
+  let friendRequests = { incoming: [], outgoing: [] };
   let queueWaiting = false;
   let pendingInvite = null;
   let racePayload = null;
@@ -108,7 +109,9 @@ window.DogRace = window.DogRace || {};
     }
     lobby = null;
     friends = [];
+    friendRequests = { incoming: [], outgoing: [] };
     queueWaiting = false;
+    pendingInvite = null;
     racePayload = null;
   }
 
@@ -153,6 +156,17 @@ window.DogRace = window.DogRace || {};
       socket.on("friends:list", (list) => {
         friends = list || [];
         if (DogRace.UI && DogRace.UI.renderMpFriends) DogRace.UI.renderMpFriends();
+        if (DogRace.UI && DogRace.UI.renderLobbyFriends) DogRace.UI.renderLobbyFriends();
+      });
+
+      socket.on("friends:requests", (data) => {
+        friendRequests = data || { incoming: [], outgoing: [] };
+        if (DogRace.UI && DogRace.UI.renderMpFriendRequests) DogRace.UI.renderMpFriendRequests();
+      });
+
+      socket.on("friends:request", (data) => {
+        emitToast((data.from && data.from.nickname ? data.from.nickname : "Someone") + " sent a friend request", "🐾");
+        if (DogRace.UI && DogRace.UI.renderMpFriendRequests) DogRace.UI.renderMpFriendRequests();
       });
 
       socket.on("lobby:update", (data) => {
@@ -164,8 +178,13 @@ window.DogRace = window.DogRace || {};
       socket.on("lobby:invite", (data) => {
         pendingInvite = data;
         if (onInvite) onInvite(data);
-        emitToast("Invite from " + data.from + "!", "📨");
+        emitToast("Lobby invite from " + (data.from || "friend") + "!", "📨");
         if (DogRace.UI && DogRace.UI.showMpInvite) DogRace.UI.showMpInvite(data);
+      });
+
+      socket.on("lobby:inviteDeclined", (data) => {
+        emitToast((data.nickname || "Friend") + " declined your lobby invite", "🙅");
+        if (DogRace.UI && DogRace.UI.renderLobbyFriends) DogRace.UI.renderLobbyFriends(data.nickname);
       });
 
       socket.on("lobby:kicked", () => {
@@ -223,6 +242,9 @@ window.DogRace = window.DogRace || {};
     getFriends() {
       return friends;
     },
+    getFriendRequests() {
+      return friendRequests;
+    },
     getPendingInvite() {
       return pendingInvite;
     },
@@ -270,8 +292,20 @@ window.DogRace = window.DogRace || {};
       return rpc("dog:set", dogId);
     },
 
-    addFriend(nickname) {
-      return rpc("friends:add", nickname);
+    requestFriend(nickname) {
+      return rpc("friends:request", nickname);
+    },
+
+    acceptFriendRequest(fromId) {
+      return rpc("friends:accept", fromId);
+    },
+
+    declineFriendRequest(fromId) {
+      return rpc("friends:decline", fromId);
+    },
+
+    cancelFriendRequest(targetId) {
+      return rpc("friends:cancel", targetId);
     },
 
     removeFriend(friendId) {
@@ -283,11 +317,17 @@ window.DogRace = window.DogRace || {};
     },
 
     createLobby(trackId) {
-      return rpc("lobby:create", trackId || "green_park");
+      return rpc("lobby:create", trackId || "green_park").then((res) => {
+        if (res.ok && res.lobby) lobby = res.lobby;
+        return res;
+      });
     },
 
     joinLobby(lobbyId) {
-      return rpc("lobby:join", lobbyId);
+      return rpc("lobby:join", lobbyId).then((res) => {
+        if (res.ok && res.lobby) lobby = res.lobby;
+        return res;
+      });
     },
 
     joinFriendLobby(nickname) {
@@ -298,8 +338,8 @@ window.DogRace = window.DogRace || {};
       return rpc("lobby:leave");
     },
 
-    inviteFriend(nickname) {
-      return rpc("lobby:invite", nickname);
+    inviteFriend(friendId) {
+      return rpc("lobby:invite", friendId);
     },
 
     setTrack(trackId) {
@@ -337,8 +377,26 @@ window.DogRace = window.DogRace || {};
     acceptInvite() {
       if (!pendingInvite) return Promise.resolve({ ok: false });
       const id = pendingInvite.lobbyId;
-      pendingInvite = null;
-      return this.joinLobby(id);
+      return rpc("lobby:acceptInvite", id).then((res) => {
+        if (res.ok) {
+          pendingInvite = null;
+          if (res.lobby) lobby = res.lobby;
+          if (DogRace.UI && DogRace.UI.hideMpInvite) DogRace.UI.hideMpInvite();
+        }
+        return res;
+      });
+    },
+
+    declineInvite() {
+      if (!pendingInvite) return Promise.resolve({ ok: false });
+      const id = pendingInvite.lobbyId;
+      return rpc("lobby:declineInvite", id).then((res) => {
+        if (res.ok) {
+          pendingInvite = null;
+          if (DogRace.UI && DogRace.UI.hideMpInvite) DogRace.UI.hideMpInvite();
+        }
+        return res;
+      });
     },
 
   async quitLobbyAndMenu() {

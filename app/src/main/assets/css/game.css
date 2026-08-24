@@ -398,4 +398,5 @@ html[dir="rtl"] .toggle input:checked + .switch::after { transform: translateX(-
 .lobby-player strong { display: block; }
 .lobby-player small { opacity: 0.85; font-weight: 700; }
 .lobby-track-grid { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
-.lobby-track-label { margin: 0; font-weight: 800; color: var(--gold); }
+.mp-friend-row.pending { border-color: var(--gold); }
+.mp-friend-row.declined { opacity: 0.75; border-color: #e11d48; }
