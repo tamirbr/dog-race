@@ -169,7 +169,7 @@ window.DogRace = window.DogRace || {};
 
     const raceScreen = $("screen-race");
     const beginSwipe = (e) => {
-      if (e.target.closest && e.target.closest("#btn-boost, #btn-jump, #btn-pause, .overlay")) return;
+      if (e.target.closest && e.target.closest("#btn-boost, #btn-jump, #btn-pause, #steer-pad, .overlay")) return;
       App.swipe.active = true;
       App.swipe.x = e.clientX;
       App.swipe.y = e.clientY;
@@ -223,10 +223,31 @@ window.DogRace = window.DogRace || {};
     jumpBtn.addEventListener("pointerup", endJump);
     jumpBtn.addEventListener("pointerleave", endJump);
     jumpBtn.addEventListener("pointercancel", endJump);
+
+    function bindSteerButton(btn, dir) {
+      const press = (e) => {
+        e.preventDefault();
+        changeLane(dir);
+        btn.classList.add("hot");
+        DogRace.Audio.play("click", { volume: 0.35 });
+      };
+      const release = () => btn.classList.remove("hot");
+      btn.addEventListener("pointerdown", press);
+      btn.addEventListener("pointerup", release);
+      btn.addEventListener("pointerleave", release);
+      btn.addEventListener("pointercancel", release);
+    }
+    bindSteerButton($("btn-steer-left"), -1);
+    bindSteerButton($("btn-steer-right"), 1);
   }
 
   function onAction(action) {
     if (action === "finish-tutorial") {
+      DogRace.Save.data.tutorialDone = true;
+      DogRace.Save.persist();
+      go("menu");
+    }
+    if (action === "skip-tutorial") {
       DogRace.Save.data.tutorialDone = true;
       DogRace.Save.persist();
       go("menu");

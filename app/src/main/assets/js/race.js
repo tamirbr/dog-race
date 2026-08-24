@@ -401,7 +401,9 @@ window.DogRace = window.DogRace || {};
       if (item.taken) continue;
       const dz = item.z - p.z;
       if (dz < -8 || dz > 16) continue;
-      const sameLane = item.lane == null || item.lane < 0 ? Math.abs(item.x - laneX(p.lane)) < 0.28 : item.lane === p.lane;
+      const sameLane = item.lane == null || item.lane < 0
+        ? Math.abs(item.x - laneX(p.lane)) < (DogRace.Config.race.laneHitRadius || 0.28)
+        : item.lane === p.lane;
       if (!sameLane) continue;
 
       if (item.kind === "coin") {

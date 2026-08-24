@@ -18,19 +18,25 @@
       </div>
     </section>
 
-    <section id="screen-tutorial" class="screen">
+    <section id="screen-tutorial" class="screen tutorial-screen">
       <div class="card tutorial-card">
+        <div class="tutorial-hero">🐕‍🦺</div>
         <h2 data-i18n="tut.title">WELCOME TO DOG RACE!</h2>
+        <p class="tutorial-sub" data-i18n="tut.subtitle">Quick guide for new racers!</p>
         <div class="scroller scroller-pane">
           <ul class="tips">
-            <li><span>⬅️➡️</span> <i data-i18n="tut.swipe">Swipe left or right to change lanes</i></li>
-            <li><span>⬆️</span> <i data-i18n="tut.jump">Tap JUMP to leap over obstacles</i></li>
-            <li><span>⚡</span> <i data-i18n="tut.boost">Hold BOOST to go faster</i></li>
-            <li><span>🪙</span> <i data-i18n="tut.coins">Collect coins on the track</i></li>
-            <li><span>🏆</span> <i data-i18n="tut.win">Finish first to win big</i></li>
+            <li><span class="tip-icon steer">◀▶</span> <i data-i18n="tut.buttons">Tap the LEFT and RIGHT buttons to change lanes</i></li>
+            <li><span class="tip-icon">👆</span> <i data-i18n="tut.swipe">Or swipe left or right on the track</i></li>
+            <li><span class="tip-icon">⬆️</span> <i data-i18n="tut.jump">Tap JUMP to leap over obstacles</i></li>
+            <li><span class="tip-icon">⚡</span> <i data-i18n="tut.boost">Hold BOOST to go faster</i></li>
+            <li><span class="tip-icon">🪙</span> <i data-i18n="tut.coins">Collect coins on the track</i></li>
+            <li><span class="tip-icon">🏆</span> <i data-i18n="tut.win">Finish first to win big!</i></li>
           </ul>
         </div>
-        <button class="btn gold" data-action="finish-tutorial" data-i18n="tut.start">LET'S RACE!</button>
+        <div class="tutorial-actions">
+          <button class="btn gold" data-action="finish-tutorial" data-i18n="tut.start">LET'S RACE!</button>
+          <button class="btn ghost" data-action="skip-tutorial" data-i18n="tut.skip">SKIP</button>
+        </div>
       </div>
     </section>
 
@@ -65,6 +71,7 @@
           <button class="btn sky" data-go="upgrades" data-i18n="nav.upgrades">UPGRADES</button>
           <button class="btn grape" data-go="shop" data-i18n="nav.shop">SHOP</button>
           <button class="btn peach" data-go="missions" data-i18n="nav.missions">MISSIONS</button>
+          <button class="btn ghost menu-help" data-go="tutorial" data-i18n="nav.help">HOW TO PLAY</button>
         </div>
       </nav>
     </section>
@@ -178,6 +185,16 @@
           <span>⬆️</span>
           <b data-i18n="hud.jump">JUMP</b>
         </button>
+        <div class="steer-pad" id="steer-pad">
+          <button class="action steer left" id="btn-steer-left" type="button" aria-label="Steer left">
+            <span>◀</span>
+            <b data-i18n="hud.left">LEFT</b>
+          </button>
+          <button class="action steer right" id="btn-steer-right" type="button" aria-label="Steer right">
+            <span>▶</span>
+            <b data-i18n="hud.right">RIGHT</b>
+          </button>
+        </div>
         <button class="boost" id="btn-boost">
           <img src="img/boost_btn.png" data-i18n-alt="hud.boost" alt="Boost" />
           <b data-i18n="hud.boost">BOOST</b>

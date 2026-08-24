@@ -211,7 +211,7 @@ window.DogRace = window.DogRace || {};
     if (kind === "tree") return { mul: 0.36, max: 0.28 };
     if (kind === "cactus") return { mul: 0.24, max: 0.2 };
     if (kind === "puddle" || kind === "ice") return { mul: 0.18, max: 0.1 };
-    if (kind === "coin" || kind === "boost" || kind === "shield") return { mul: 0.11, max: 0.1 };
+    if (kind === "coin" || kind === "boost" || kind === "shield") return { mul: 0.14, max: 0.13 };
     return { mul: 0.15, max: 0.16 };
   }
 
@@ -557,7 +557,7 @@ window.DogRace = window.DogRace || {};
       if (p === player) return;
       if (p.z <= cameraZ + 50) return;
       if (p.z < player.z + 90) {
-        const destW = Math.min(width * 0.16, height * 0.24);
+        const destW = Math.min(width * 0.17, height * 0.26);
         const destY = playerFeet - destW * 1.12 - (p.jumpHeight || 0) * destW * 0.55 + (p.hitAnim > 0 ? 8 : 0);
         drawRacer(p, focusX(p.x) + hitJolt(p), destY, destW, height);
         return;
@@ -568,7 +568,7 @@ window.DogRace = window.DogRace || {};
       drawRacer(p, placed.x + hitJolt(p), placed.y - (p.jumpHeight || 0) * placed.w * 0.7 + (p.hitAnim > 0 ? 8 : 0), placed.w, height);
     });
 
-    const destW = Math.min(width * 0.18, height * 0.28);
+    const destW = Math.min(width * 0.2, height * 0.3);
     let destY = playerFeet - destW * 1.1 - (player.jumpHeight || 0) * destW * 0.55 + (player.hitAnim > 0 ? 8 : 0);
     destY = Math.min(destY, height - destW * 1.08 - 16);
     drawRacer(player, focusX(player.x) + hitJolt(player), destY, destW, height);
