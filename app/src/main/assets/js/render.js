@@ -504,7 +504,8 @@ window.DogRace = window.DogRace || {};
     }
 
     function drawRacer(p, destX, destY, destW, clipY) {
-      const img = DogRace.Assets.get(p.def.id + "_back");
+      const spriteKey = (p.def.spriteId || p.def.id) + "_back";
+      const img = DogRace.Assets.get(spriteKey);
       const bounce = Math.sin(p.bounce * 2) * 0.06 + (p.boosting ? 0.04 : 0) + (p.jumpHeight || 0) * 0.08;
       const lean = p.hitAnim > 0 ? Math.sin(p.hitAnim * 38) * 0.35 : p.lean * 0.22;
       const destH = destW * (p.hitAnim > 0 ? 1.05 : 1.18);

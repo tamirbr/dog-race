@@ -173,7 +173,7 @@ window.DogRace = window.DogRace || {};
 
     renderDogs() {
       this.refreshCoins();
-      $("dogs-list").innerHTML = DogRace.Dogs.map((dog) => {
+      $("dogs-list-stack").innerHTML = DogRace.Dogs.map((dog) => {
         const state = DogRace.Save.dogState(dog.id);
         const stats = DogRace.Save.effectiveStats(dog.id);
         const rarity = DogRace.Rarity[dog.rarity];

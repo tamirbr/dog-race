@@ -174,7 +174,7 @@ window.DogRace = window.DogRace || {};
 
     const raceScreen = $("screen-race");
     const beginSwipe = (e) => {
-      if (e.target.closest && e.target.closest("#btn-boost, #btn-jump, #btn-pause, #steer-pad, .overlay, .pause-big")) return;
+      if (e.target.closest && e.target.closest("#btn-boost, #btn-jump, #btn-pause, #race-controls, .overlay, .pause-big")) return;
       App.swipe.active = true;
       App.swipe.x = e.clientX;
       App.swipe.y = e.clientY;
