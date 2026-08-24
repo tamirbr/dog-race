@@ -86,7 +86,14 @@ DogRace.Config = {
       stamina: 1,
       boost: 1,
     },
-    costs: [250, 500, 900, 1500, 2300, 3400, 4800, 6500],
+    costs: [150, 300, 550, 900, 1400, 2100, 3000, 4200],
+  },
+
+  kidMode: {
+    aiSpeedMul: 0.88,
+    aiSkillMul: 0.82,
+    upgradeCostMul: 0.75,
+    coinBonusMul: 1.15,
   },
 
   economy: {

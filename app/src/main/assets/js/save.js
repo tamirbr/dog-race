@@ -37,7 +37,7 @@ window.DogRace = window.DogRace || {};
       selectedDogId: "buddy",
       dogs,
       completedTracks: {},
-      settings: { music: true, sfx: true, vibration: true, language: null },
+      settings: { music: true, sfx: true, vibration: true, language: null, kidMode: true },
       tutorialDone: false,
       seenSplash: false,
       stats: {
@@ -68,6 +68,7 @@ window.DogRace = window.DogRace || {};
     const defaultStats = Object.assign({}, base.stats);
     const merged = Object.assign(base, raw);
     merged.settings = Object.assign({}, defaultSettings, raw.settings || {});
+    if (merged.settings.kidMode == null) merged.settings.kidMode = true;
     merged.stats = Object.assign({}, defaultStats, raw.stats || {});
     const knownLang =
       DogRace.I18n && DogRace.I18n.langs.some((lang) => lang.id === merged.settings.language);
@@ -212,7 +213,11 @@ window.DogRace = window.DogRace || {};
 
     upgradeCost(statLevel) {
       const costs = Config().upgrades.costs;
-      return costs[Math.min(statLevel, costs.length - 1)];
+      let cost = costs[Math.min(statLevel, costs.length - 1)];
+      if (this.data.settings.kidMode) {
+        cost = Math.round(cost * (Config().kidMode.upgradeCostMul || 1));
+      }
+      return cost;
     },
 
     upgradeStat(dogId, stat) {
@@ -288,9 +293,9 @@ window.DogRace = window.DogRace || {};
       if (result.hits === 0) this.bumpStat("cleanRaces", 1);
       this.bumpStat("track_" + result.trackId, 1);
       this.data.completedTracks[result.trackId] = (this.data.completedTracks[result.trackId] || 0) + 1;
-      this.checkAchievements();
+      const newAchievements = this.checkAchievements();
       this.persist();
-      return leveled;
+      return { leveled, newAchievements };
     },
 
     missionProgress(mission) {
@@ -308,12 +313,29 @@ window.DogRace = window.DogRace || {};
     },
 
     checkAchievements() {
+      const newly = [];
       DogRace.Achievements.forEach((ach) => {
         if (this.data.achievementsUnlocked[ach.id]) return;
         if ((this.data.stats[ach.stat] || 0) >= ach.target) {
           this.data.achievementsUnlocked[ach.id] = true;
+          newly.push(ach);
         }
       });
+      return newly;
+    },
+
+    nextMission() {
+      for (let i = 0; i < DogRace.Missions.length; i++) {
+        const mission = DogRace.Missions[i];
+        if (this.data.missionsClaimed[mission.id]) continue;
+        const progress = this.missionProgress(mission);
+        return {
+          mission,
+          progress,
+          ready: progress >= mission.target,
+        };
+      }
+      return null;
     },
 
     refreshDaily() {

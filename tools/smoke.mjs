@@ -90,7 +90,7 @@ if (DR.formatRaceTime(14.2) !== "14.2s") throw new Error("Short race time format
 if (DR.formatRaceTime(65.2) !== "1:05.2") throw new Error("Long race time format failed");
 if (DR.I18n.t("rec.score") !== "Score") throw new Error("Record strings missing");
 
-const leveled = DR.Save.applyRaceOutcome(race.results);
+const leveled = DR.Save.applyRaceOutcome(race.results).leveled;
 if (DR.Save.data.coins <= 0) throw new Error("Coins were not awarded");
 if (DR.Save.data.stats.racesFinished !== 1) throw new Error("Race stat missing");
 

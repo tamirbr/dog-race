@@ -487,9 +487,20 @@ window.DogRace = window.DogRace || {};
     return order;
   }
 
+  function raceDifficulty(trackDiff) {
+    const base = DogRace.Config.difficulty[trackDiff] || DogRace.Config.difficulty.normal;
+    if (!DogRace.Save || !DogRace.Save.data || !DogRace.Save.data.settings.kidMode) return base;
+    const km = DogRace.Config.kidMode || {};
+    return {
+      speed: base.speed * (km.aiSpeedMul || 0.88),
+      skill: base.skill * (km.aiSkillMul || 0.82),
+      label: base.label,
+    };
+  }
+
   DogRace.createRace = function ({ track, playerDogId, fieldSize }) {
     const course = DogRace.buildCourse(track);
-    const difficulty = DogRace.Config.difficulty[track.aiDifficulty] || DogRace.Config.difficulty.normal;
+    const difficulty = raceDifficulty(track.aiDifficulty);
     const player = createParticipant({
       id: "player",
       kind: Kind.LOCAL,
@@ -610,11 +621,15 @@ window.DogRace = window.DogRace || {};
   DogRace.buildResults = function (race) {
     const place = race.player.finishPlace;
     const eco = DogRace.Config.economy;
-    const placeCoins = Math.round((eco.placeCoins[place - 1] || 25) * race.track.rewardMultiplier);
+    const km = DogRace.Config.kidMode || {};
+    const kidMul = DogRace.Save && DogRace.Save.data && DogRace.Save.data.settings.kidMode ? (km.coinBonusMul || 1) : 1;
+    const placeCoins = Math.round((eco.placeCoins[place - 1] || 25) * race.track.rewardMultiplier * kidMul);
     const pickedCoins = race.player.coins;
     const xp = Math.round(((eco.placeXp[place - 1] || 20) + eco.finishXp) * race.track.rewardMultiplier);
+    const stars = place === 1 ? 3 : place <= 3 ? 2 : 1;
     return {
       place,
+      stars,
       field: race.participants.length,
       dogId: race.player.dogId,
       trackId: race.track.id,

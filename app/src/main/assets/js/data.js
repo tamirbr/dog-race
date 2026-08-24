@@ -150,7 +150,7 @@ DogRace.Tracks = [
     lengthMeters: 750,
     segments: 430,
     environment: "desert",
-    aiDifficulty: "normal",
+    aiDifficulty: "easy",
     rewardMultiplier: 1.15,
     recommendedLevel: 1,
     unlockWins: 1,
@@ -354,22 +354,22 @@ DogRace.Tracks = [
 ];
 
 DogRace.Missions = [
-  { id: "finish_3", name: "Warmup Pack", description: "Finish 3 races", target: 3, stat: "racesFinished", rewardCoins: 150, rewardXp: 40 },
-  { id: "coins_100", name: "Pocket Change", description: "Collect 100 coins on the track", target: 100, stat: "coinsPicked", rewardCoins: 200, rewardXp: 30 },
-  { id: "boost_10", name: "Turbo Pup", description: "Use boost 10 times", target: 10, stat: "boostsUsed", rewardCoins: 180, rewardXp: 30 },
-  { id: "win_2", name: "Podium Bound", description: "Finish 1st twice", target: 2, stat: "wins", rewardCoins: 350, rewardXp: 60 },
-  { id: "park_race", name: "Park Regular", description: "Race on Green Park 2 times", target: 2, stat: "track_green_park", rewardCoins: 120, rewardXp: 25 },
-  { id: "rainbow_run", name: "Rainbow Splash", description: "Race on Rainbow Bay", target: 1, stat: "track_rainbow_bay", rewardCoins: 250, rewardXp: 40 },
-  { id: "carnival_night", name: "Carnival Lights", description: "Race on Starlight Carnival", target: 1, stat: "track_starlight_carnival", rewardCoins: 300, rewardXp: 50 },
+  { id: "finish_3", icon: "🏁", name: "Warmup Pack", description: "Finish 3 races", hint: "Just finish — any place counts!", target: 3, stat: "racesFinished", rewardCoins: 200, rewardXp: 50 },
+  { id: "coins_100", icon: "🪙", name: "Coin Chaser", description: "Collect 50 coins on the track", hint: "Grab shiny coins while you run!", target: 50, stat: "coinsPicked", rewardCoins: 250, rewardXp: 40 },
+  { id: "boost_10", icon: "⚡", name: "Turbo Pup", description: "Use boost 5 times", hint: "Hold the BOOST button!", target: 5, stat: "boostsUsed", rewardCoins: 200, rewardXp: 35 },
+  { id: "win_2", icon: "🏆", name: "Podium Bound", description: "Finish 1st twice", hint: "Be the fastest dog!", target: 2, stat: "wins", rewardCoins: 400, rewardXp: 70 },
+  { id: "park_race", icon: "🌳", name: "Park Regular", description: "Race on Green Park 2 times", hint: "Great for practice!", target: 2, stat: "track_green_park", rewardCoins: 150, rewardXp: 30 },
+  { id: "rainbow_run", icon: "🌈", name: "Rainbow Splash", description: "Race on Rainbow Bay", hint: "Unlock after more wins!", target: 1, stat: "track_rainbow_bay", rewardCoins: 300, rewardXp: 50 },
+  { id: "carnival_night", icon: "🎡", name: "Carnival Lights", description: "Race on Starlight Carnival", hint: "The fanciest track!", target: 1, stat: "track_starlight_carnival", rewardCoins: 350, rewardXp: 60 },
 ];
 
 DogRace.Achievements = [
-  { id: "first_victory", name: "First Victory", description: "Win your first race", stat: "wins", target: 1 },
-  { id: "speed_demon", name: "Speed Demon", description: "Use boost 100 times", stat: "boostsUsed", target: 100 },
-  { id: "collector", name: "Collector", description: "Own 3 dogs", stat: "dogsOwned", target: 3 },
-  { id: "champion", name: "Champion", description: "Win 25 races", stat: "wins", target: 25 },
-  { id: "untouchable", name: "Untouchable", description: "Finish a race without hitting an obstacle", stat: "cleanRaces", target: 1 },
-  { id: "millionaire", name: "Millionaire", description: "Earn 100,000 total coins", stat: "lifetimeCoins", target: 100000 },
+  { id: "first_victory", icon: "🏆", sticker: "🥇", name: "First Victory", description: "Win your first race", stat: "wins", target: 1 },
+  { id: "speed_demon", icon: "⚡", sticker: "💨", name: "Speed Demon", description: "Use boost 100 times", stat: "boostsUsed", target: 100 },
+  { id: "collector", icon: "🐕", sticker: "🦴", name: "Collector", description: "Own 3 dogs", stat: "dogsOwned", target: 3 },
+  { id: "champion", icon: "👑", sticker: "🌟", name: "Champion", description: "Win 25 races", stat: "wins", target: 25 },
+  { id: "untouchable", icon: "🛡️", sticker: "✨", name: "Untouchable", description: "Finish a race without hitting an obstacle", stat: "cleanRaces", target: 1 },
+  { id: "millionaire", icon: "💰", sticker: "🪙", name: "Millionaire", description: "Earn 100,000 total coins", stat: "lifetimeCoins", target: 100000 },
 ];
 
 DogRace.dogById = function (id) {

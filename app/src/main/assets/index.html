@@ -23,16 +23,14 @@
         <div class="tutorial-hero">🐕‍🦺</div>
         <h2 data-i18n="tut.title">WELCOME TO DOG RACE!</h2>
         <p class="tutorial-sub" data-i18n="tut.subtitle">Quick guide for new racers!</p>
-        <div class="scroller scroller-pane">
-          <ul class="tips">
-            <li><span class="tip-icon steer">◀▶</span> <i data-i18n="tut.buttons">Tap the LEFT and RIGHT buttons to change lanes</i></li>
-            <li><span class="tip-icon">👆</span> <i data-i18n="tut.swipe">Or swipe left or right on the track</i></li>
-            <li><span class="tip-icon">⬆️</span> <i data-i18n="tut.jump">Tap JUMP to leap over obstacles</i></li>
-            <li><span class="tip-icon">⚡</span> <i data-i18n="tut.boost">Hold BOOST to go faster</i></li>
-            <li><span class="tip-icon">🪙</span> <i data-i18n="tut.coins">Collect coins on the track</i></li>
-            <li><span class="tip-icon">🏆</span> <i data-i18n="tut.win">Finish first to win big!</i></li>
-          </ul>
+        <div class="tutorial-steps">
+          <div class="tut-step"><span>◀▶</span><b data-i18n="tut.stepSteer">STEER</b></div>
+          <div class="tut-step"><span>⬆️</span><b data-i18n="tut.stepJump">JUMP</b></div>
+          <div class="tut-step"><span>⚡</span><b data-i18n="tut.stepBoost">BOOST</b></div>
+          <div class="tut-step"><span>🪙</span><b data-i18n="tut.stepCoins">COINS</b></div>
+          <div class="tut-step wide"><span>🏆</span><b data-i18n="tut.stepWin">WIN!</b></div>
         </div>
+        <p class="tutorial-hint" data-i18n="tut.hint">Use the big buttons at the bottom — or swipe!</p>
         <div class="tutorial-actions">
           <button class="btn gold" data-action="finish-tutorial" data-i18n="tut.start">LET'S RACE!</button>
           <button class="btn ghost" data-action="skip-tutorial" data-i18n="tut.skip">SKIP</button>
@@ -64,6 +62,7 @@
           <p id="menu-dog-info">Level 1 · Friendly Mix</p>
         </div>
       </div>
+      <div class="card menu-goal" id="menu-goal"></div>
       <nav class="menu-nav">
         <button class="btn gold xl" data-go="tracks" data-i18n="nav.race">RACE</button>
         <div class="menu-grid">
@@ -152,6 +151,12 @@
             <input id="set-vib" type="checkbox" />
             <i class="switch" aria-hidden="true"></i>
           </label>
+          <label class="toggle">
+            <span data-i18n="set.kidMode">Kid Mode</span>
+            <input id="set-kid" type="checkbox" />
+            <i class="switch" aria-hidden="true"></i>
+          </label>
+          <p class="settings-note" data-i18n="set.kidModeHint">Easier races, cheaper upgrades, bonus coins!</p>
           <button type="button" class="lang-open" id="set-language" data-action="language-open">
             <span data-i18n="set.language">Language</span>
             <strong id="set-language-name">English</strong>
@@ -177,9 +182,13 @@
           <div class="hud-progress"><i id="hud-bar"></i></div>
           <div class="hud-right">
             <div class="hud-pill" id="hud-coins">🪙 0</div>
-            <button class="btn mini pause" id="btn-pause">❚❚</button>
+            <button class="btn pause-big" id="btn-pause" type="button" aria-label="Pause">
+              <span>❚❚</span>
+              <b data-i18n="pause.btn">PAUSE</b>
+            </button>
           </div>
         </div>
+        <div class="coin-float hidden" id="coin-float"></div>
         <div class="countdown" id="countdown"></div>
         <button class="action jump" id="btn-jump" type="button">
           <span>⬆️</span>
@@ -211,9 +220,12 @@
     </section>
 
     <section id="screen-results" class="screen results-screen">
-      <div class="card results-card">
+      <div class="confetti-burst" id="results-confetti" aria-hidden="true"></div>
+      <div class="card results-card" id="results-card">
         <div class="trophy" id="results-emoji">🏆</div>
+        <div class="results-stars" id="results-stars" aria-label="Stars earned"></div>
         <h2 id="results-title">YOU WIN!</h2>
+        <p class="results-cheer" id="results-cheer"></p>
         <p class="place" id="results-place">1st</p>
         <div class="rewards">
           <div>+<span id="results-coins">0</span> 🪙</div>
@@ -230,6 +242,8 @@
       </div>
     </section>
   </div>
+
+  <div class="toast-stack" id="toast-stack" aria-live="polite"></div>
 
   <div class="confirm hidden" id="rename-dog">
     <div class="card">

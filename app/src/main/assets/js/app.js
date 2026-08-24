@@ -54,8 +54,12 @@ window.DogRace = window.DogRace || {};
 
   function finishRace() {
     if (!App.race || !App.race.results) return;
-    const leveled = DogRace.Save.applyRaceOutcome(App.race.results);
+    const outcome = DogRace.Save.applyRaceOutcome(App.race.results);
+    const leveled = outcome.leveled || 0;
     DogRace.UI.renderResults(App.race.results, leveled);
+    if (outcome.newAchievements && outcome.newAchievements.length) {
+      DogRace.UI.showStickers(outcome.newAchievements);
+    }
     if (App.race.results.place === 1) {
       DogRace.Audio.play("win");
     } else if (App.race.results.place <= 3) {
@@ -86,6 +90,7 @@ window.DogRace = window.DogRace || {};
       }
       if (ev.type === "coin" && ev.who === App.race.player) {
         DogRace.Audio.play("coin", { rate: 0.95 + Math.random() * 0.15 });
+        DogRace.UI.showCoinFloat(DogRace.Config.economy.coinPickupValue);
       }
       if (ev.type === "pickup" && ev.who === App.race.player) DogRace.Audio.play("pickup");
       if (ev.type === "boost" && ev.who === App.race.player) {
@@ -169,7 +174,7 @@ window.DogRace = window.DogRace || {};
 
     const raceScreen = $("screen-race");
     const beginSwipe = (e) => {
-      if (e.target.closest && e.target.closest("#btn-boost, #btn-jump, #btn-pause, #steer-pad, .overlay")) return;
+      if (e.target.closest && e.target.closest("#btn-boost, #btn-jump, #btn-pause, #steer-pad, .overlay, .pause-big")) return;
       App.swipe.active = true;
       App.swipe.x = e.clientX;
       App.swipe.y = e.clientY;
@@ -343,8 +348,12 @@ window.DogRace = window.DogRace || {};
       }
       if (btn.dataset.track) startRace(btn.dataset.track);
       if (btn.dataset.claimMission) {
-        if (DogRace.Save.claimMission(btn.dataset.claimMission)) DogRace.Audio.play("win", { volume: 0.45 });
+        if (DogRace.Save.claimMission(btn.dataset.claimMission)) {
+          DogRace.Audio.play("win", { volume: 0.45 });
+          DogRace.UI.toast(DogRace.I18n.t("ui.missionClaimed"), "🎁");
+        }
         DogRace.UI.renderMissions();
+        if (App.screen === "menu") DogRace.UI.renderMenu();
       }
     });
 
@@ -371,6 +380,14 @@ window.DogRace = window.DogRace || {};
       DogRace.Save.data.settings.vibration = e.target.checked;
       DogRace.Save.persist();
     });
+    const kidToggle = $("set-kid");
+    if (kidToggle) {
+      kidToggle.addEventListener("change", (e) => {
+        DogRace.Save.data.settings.kidMode = e.target.checked;
+        DogRace.Save.persist();
+        if (App.screen === "tracks") DogRace.UI.renderTracks();
+      });
+    }
 
     window.addEventListener("keydown", (e) => {
       if (!$("lang-picker").classList.contains("hidden")) {
