@@ -78,7 +78,7 @@ if (race.player.lane !== 0) throw new Error("Player did not stay in chosen lane"
 
 let guard = 240 + 45;
 while (race.phase !== "results" && guard < 20000) {
-  DR.stepRace(race, { laneDelta: guard % 180 === 0 ? 1 : 0, boost: guard % 90 < 20, jump: guard % 110 === 0 }, 1 / 60);
+  DR.stepRace(race, { laneDelta: guard % 180 === 0 ? 1 : 0, boostRequest: guard % 90 === 0, jump: guard % 110 === 0 }, 1 / 60);
   guard += 1;
 }
 if (race.phase !== "results") throw new Error("Race never finished");

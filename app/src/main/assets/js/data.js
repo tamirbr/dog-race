@@ -413,7 +413,7 @@ DogRace.Tracks = [
 DogRace.Missions = [
   { id: "finish_3", icon: "🏁", name: "Warmup Pack", description: "Finish 3 races", hint: "Just finish — any place counts!", target: 3, stat: "racesFinished", rewardCoins: 200, rewardXp: 50 },
   { id: "coins_100", icon: "🪙", name: "Coin Chaser", description: "Collect 50 coins on the track", hint: "Grab shiny coins while you run!", target: 50, stat: "coinsPicked", rewardCoins: 250, rewardXp: 40 },
-  { id: "boost_10", icon: "⚡", name: "Turbo Pup", description: "Use boost 5 times", hint: "Hold the BOOST button!", target: 5, stat: "boostsUsed", rewardCoins: 200, rewardXp: 35 },
+  { id: "boost_10", icon: "⚡", name: "Turbo Pup", description: "Use boost 5 times", hint: "Tap the BOOST button!", target: 5, stat: "boostsUsed", rewardCoins: 200, rewardXp: 35 },
   { id: "win_2", icon: "🏆", name: "Podium Bound", description: "Finish 1st twice", hint: "Be the fastest dog!", target: 2, stat: "wins", rewardCoins: 400, rewardXp: 70 },
   { id: "park_race", icon: "🌳", name: "Park Regular", description: "Race on Green Park 2 times", hint: "Great for practice!", target: 2, stat: "track_green_park", rewardCoins: 150, rewardXp: 30 },
   { id: "rainbow_run", icon: "🌈", name: "Rainbow Splash", description: "Race on Rainbow Bay", hint: "Unlock after more wins!", target: 1, stat: "track_rainbow_bay", rewardCoins: 300, rewardXp: 50 },

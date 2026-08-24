@@ -110,6 +110,7 @@ window.DogRace = window.DogRace || {};
       finishPlace: 0,
       finishTime: 0,
       boosting: false,
+      boostLatched: false,
       wantBoost: false,
       boostMeter: motion.startBoost,
       stamina: 1,
@@ -254,7 +255,10 @@ window.DogRace = window.DogRace || {};
   function updateLocal(p, input) {
     if (input.laneDelta) p.lane = clampLane(p.lane + input.laneDelta);
     if (input.lane != null) p.lane = clampLane(input.lane);
-    p.wantBoost = !!input.boost;
+    if ((input.boostRequest || input.boost) && !p.boostLatched && p.boostMeter > 0) {
+      p.boostLatched = true;
+    }
+    p.wantBoost = p.boostLatched && p.boostMeter > 0;
     p.wantJump = !!input.jump;
   }
 
@@ -321,6 +325,7 @@ window.DogRace = window.DogRace || {};
       p.stun -= dt;
       p.speed = Math.max(30, p.speed - P.stunDecel * dt);
       p.boosting = false;
+      p.boostLatched = false;
       return;
     }
 
@@ -354,7 +359,10 @@ window.DogRace = window.DogRace || {};
         world.events.push({ type: "boost", who: p });
       }
     } else {
-      p.boostMeter = Math.min(1, p.boostMeter + P.boostIdleRegen * (0.7 + p.stats.stamina * 0.04) * dt);
+      if (p.boostLatched && p.boostMeter <= 0) p.boostLatched = false;
+      if (!p.boostLatched) {
+        p.boostMeter = Math.min(1, p.boostMeter + P.boostIdleRegen * (0.7 + p.stats.stamina * 0.04) * dt);
+      }
     }
 
     const offRoad = false;
@@ -411,6 +419,7 @@ window.DogRace = window.DogRace || {};
         p.coins += DogRace.Config.economy.coinPickupValue;
         world.events.push({ type: "coin", who: p, item });
       } else if (item.kind === "boost") {
+        if (p.boosting || p.boostLatched) continue;
         item.taken = true;
         p.boostMeter = Math.min(1, p.boostMeter + P.boostFillPickup);
         p.speed += 40;

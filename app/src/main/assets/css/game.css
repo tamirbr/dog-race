@@ -21,7 +21,7 @@ html[dir="rtl"] .topbar h2, html[dir="rtl"] .brand strong, html[dir="rtl"] .spla
 html[lang="zh"] .topbar h2, html[lang="zh"] .brand strong, html[lang="hi"] .topbar h2 { letter-spacing: 0; }
 html[dir="rtl"] .tips { text-align: right; }
 html[dir="rtl"] .action.jump { left: 18px; right: auto; }
-html[dir="rtl"] .boost { right: 18px; left: auto; }
+html[dir="rtl"] .action.boost { right: 18px; left: auto; }
 html[dir="rtl"] .steer-pad { direction: ltr; }
 img { max-width: 100%; display: block; }
 button { font: inherit; color: inherit; }
@@ -242,13 +242,14 @@ html[dir="rtl"] .toggle input:checked + .switch::after { transform: translateX(-
   padding: 8px 8px max(8px, env(safe-area-inset-bottom, 0px));
 }
 .race-controls .action,
-.race-controls .boost { position: relative; left: auto; right: auto; bottom: auto; top: auto; }
+.race-controls .action.boost { position: relative; left: auto; right: auto; bottom: auto; top: auto; }
 .race-controls .action.jump { justify-self: start; width: 92px; height: 92px; border: 4px solid var(--stroke); border-radius: 50%; background: linear-gradient(#9ee0ff, #2f78ff); box-shadow: 0 6px 0 #16325c, 0 0 0 3px rgba(255,255,255,0.2); color: #fff; touch-action: manipulation; display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 0; }
 .race-controls .steer-pad { position: relative; transform: none; left: auto; bottom: auto; display: flex; gap: 8px; justify-self: center; }
-.race-controls .boost { justify-self: end; width: 92px; height: 92px; touch-action: manipulation; }
+.race-controls .action.boost { justify-self: end; width: 92px; height: 92px; border: 4px solid var(--stroke); border-radius: 50%; background: linear-gradient(#ffc56a, #ff7a29); box-shadow: 0 6px 0 #b45309, 0 0 0 3px rgba(255,255,255,0.2); color: #3b2200; touch-action: manipulation; display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 0; }
 .action-icon { font-size: 34px; line-height: 1; display: block; font-weight: 900; }
 .action.jump .action-icon { font-size: 38px; margin-top: 4px; }
-.action.jump b, .action.steer b, .boost b { position: static; margin-top: 2px; font-size: 11px; letter-spacing: 0.04em; text-shadow: 0 2px 0 rgba(0,0,0,0.35); }
+.action.boost .action-icon { font-size: 34px; margin-top: 2px; }
+.action.jump b, .action.steer b, .action.boost b { position: static; margin-top: 2px; font-size: 11px; letter-spacing: 0.04em; text-shadow: 0 2px 0 rgba(0,0,0,0.35); }
 .action.steer { width: 80px; height: 80px; border: 4px solid var(--stroke); border-radius: 50%; padding: 0; cursor: pointer; touch-action: manipulation; display: flex; flex-direction: column; align-items: center; justify-content: center; }
 .action.steer.left { background: linear-gradient(#9af05a, #4fb52a); color: #14320a; box-shadow: 0 6px 0 #2d6a1e, 0 0 0 3px rgba(255,255,255,0.15); }
 .action.steer.right { background: linear-gradient(#ffe56a, #f5b400); color: #3b2200; box-shadow: 0 6px 0 #b45309, 0 0 0 3px rgba(255,255,255,0.15); }
@@ -257,11 +258,10 @@ html[dir="rtl"] .toggle input:checked + .switch::after { transform: translateX(-
 .action.steer.left.hot { box-shadow: 0 3px 0 #2d6a1e; }
 .action.steer.right.hot { box-shadow: 0 3px 0 #b45309; }
 .action.jump.hot { transform: translateY(3px); box-shadow: 0 3px 0 #16325c; }
-.boost img { width: 100%; height: 100%; object-fit: contain; filter: drop-shadow(0 8px 0 rgba(0,0,0,0.2)); }
-.boost b { text-align: center; color: #fff; }
-.boost i { position: absolute; left: 14px; right: 14px; bottom: -4px; height: 8px; background: #1f2937; border-radius: 99px; overflow: hidden; border: 2px solid var(--stroke); }
-.boost i::after { content: ""; display: block; height: 100%; width: var(--boost, 50%); background: linear-gradient(90deg, #fdba74, #ea580c); }
-.boost.hot img { transform: scale(1.06); }
+.action.boost.hot { transform: translateY(3px); box-shadow: 0 3px 0 #b45309; }
+.action.boost b { text-align: center; }
+.action.boost i { position: absolute; left: 14px; right: 14px; bottom: -4px; height: 8px; background: #1f2937; border-radius: 99px; overflow: hidden; border: 2px solid var(--stroke); }
+.action.boost i::after { content: ""; display: block; height: 100%; width: var(--boost, 50%); background: linear-gradient(90deg, #fdba74, #ea580c); }
 .countdown { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; font-size: clamp(56px, 18vw, 132px); font-weight: 900; text-shadow: 0 10px 0 var(--stroke), 0 0 24px rgba(255,210,63,0.45); pointer-events: none; padding: 0 8vw; text-align: center; letter-spacing: 0.04em; color: #fff; }
 .overlay, .confirm { position: absolute; inset: 0; background: rgba(8, 12, 24, 0.55); display: flex; align-items: center; justify-content: center; z-index: 5; }
 .tutorial-screen { align-items: center; justify-content: center; background:
@@ -360,12 +360,12 @@ html[dir="rtl"] .toggle input:checked + .switch::after { transform: translateX(-
   .btn.xl { font-size: 20px; padding: 10px 16px; }
   .race-controls { gap: 4px; padding: 6px 6px max(6px, env(safe-area-inset-bottom, 0px)); }
   .race-controls .action.jump,
-  .race-controls .boost { width: 76px; height: 76px; }
+  .race-controls .action.boost { width: 76px; height: 76px; }
   .race-controls .action.steer { width: 68px; height: 68px; }
   .action-icon { font-size: 28px; }
   .action.jump .action-icon { font-size: 32px; }
   .action.steer .steer-arrow { font-size: 24px; }
-  .action.jump b, .action.steer b, .boost b { font-size: 9px; }
+  .action.jump b, .action.steer b, .action.boost b { font-size: 9px; }
   .pause-big { width: 54px; height: 54px; min-width: 54px; }
   .hud-pill { font-size: 14px; padding: 6px 10px; }
   .countdown { font-size: 80px; }
@@ -375,6 +375,6 @@ html[dir="rtl"] .toggle input:checked + .switch::after { transform: translateX(-
 }
 @media (max-width: 640px) and (orientation: landscape) {
   .race-controls .action.jump,
-  .race-controls .boost { width: 72px; height: 72px; }
+  .race-controls .action.boost { width: 72px; height: 72px; }
   .race-controls .action.steer { width: 64px; height: 64px; }
 }

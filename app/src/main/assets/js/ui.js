@@ -365,6 +365,8 @@ window.DogRace = window.DogRace || {};
       $("hud-bar").style.width = Math.round(DogRace.progressOf(race, race.player) * 100) + "%";
       $("hud-coins").textContent = coinsLabel(race.player.coins);
       $("boost-meter").style.setProperty("--boost", Math.round(race.player.boostMeter * 100) + "%");
+      const boostBtn = $("btn-boost");
+      if (boostBtn) boostBtn.classList.toggle("hot", !!(race.player.boosting || race.player.boostLatched));
     },
 
     setCountdown(text) {
