@@ -138,37 +138,7 @@ window.DogRace = window.DogRace || {};
       $("menu-dog").alt = name;
       $("menu-dog-name").textContent = name;
       $("menu-dog-info").textContent = t("menu.levelInfo", { level: state.level, breed: dogBreed(dog) });
-      this.renderMenuGoal();
       this.refreshCoins();
-    },
-
-    renderMenuGoal() {
-      const host = $("menu-goal");
-      if (!host) return;
-      const next = DogRace.Save.nextMission();
-      if (!next) {
-        host.innerHTML = `<div class="goal-inner done"><span class="goal-icon">🎉</span><div><strong>${escapeHtml(t("ui.allMissionsDone"))}</strong><p>${escapeHtml(t("ui.keepRacing"))}</p></div></div>`;
-        return;
-      }
-      const m = next.mission;
-      const icon = m.icon || "🎯";
-      const hintKey = "mission." + m.id + ".hint";
-      const hint = t(hintKey) !== hintKey ? t(hintKey) : (m.hint || t("mission." + m.id + ".desc"));
-      const pct = missionProgressPct(next.progress, m.target);
-      const claimBtn = next.ready
-        ? `<button class="btn mint mini" data-go="missions">${escapeHtml(t("ui.claimReady"))}</button>`
-        : `<button class="btn ghost mini" data-go="missions">${escapeHtml(t("ui.viewMissions"))}</button>`;
-      host.innerHTML = `<div class="goal-inner ${next.ready ? "ready" : ""}">
-        <span class="goal-icon">${icon}</span>
-        <div class="goal-body">
-          <strong>${escapeHtml(t("ui.nextGoal"))}</strong>
-          <p>${escapeHtml(t("mission." + m.id + ".name"))}</p>
-          <small>${escapeHtml(hint)}</small>
-          <div class="goal-bar"><i style="width:${pct}%"></i></div>
-          <span class="goal-count">${next.progress}/${m.target}</span>
-        </div>
-        ${claimBtn}
-      </div>`;
     },
 
     renderDogs() {

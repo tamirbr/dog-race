@@ -277,6 +277,7 @@ html[dir="rtl"] .toggle input:checked + .switch::after { transform: translateX(-
 .tutorial-hint { margin: 0 0 10px; font-size: 15px; font-weight: 800; opacity: 0.9; }
 .tutorial-actions { display: flex; flex-direction: column; gap: 6px; width: 100%; }
 .tutorial-actions .btn { margin-top: 0; }
+.menu-grid .menu-shop,
 .menu-grid .menu-help { grid-column: 1 / -1; }
 .overlay .card, .confirm .card, .tutorial-card, .results-card { width: min(460px, 92vw); text-align: center; }
 .results-card { max-height: min(94vh, 640px); padding: 12px; }
