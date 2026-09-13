@@ -313,15 +313,25 @@ function updateAi(p, race, dt) {
   p.wantBoost = p.boostMeter > 0.28 && ((pressure && race.rng() < cfg.boostChance * 8 * dt * (0.6 + diff.skill)) || p.boostMeter > 0.9);
 }
 
+function smoothExp(current, target, rate, dt) {
+  const t = 1 - Math.exp(-rate * dt);
+  return current + (target - current) * t;
+}
+
+function smoothStep(u) {
+  return u * u * (3 - 2 * u);
+}
+
 function applyLaneKeep(p, dt) {
   const P = CONFIG.physics;
   const iceMul = p.ice > 0 ? P.iceHandlingMul : 1;
   const boostMul = p.boosting ? p.motion.handlingBoostBonus : 1;
   const handling = p.motion.handling * iceMul * boostMul;
   const target = laneX(p.lane) + (p.packOffset || 0);
-  const delta = target - p.x;
-  p.x += delta * Math.min(1, handling * dt * 2.4);
-  p.lean = clamp(p.lean * 0.8 + delta * 1.4, -1, 1);
+  const rate = 14 * (0.7 + handling * 0.12);
+  p.x = smoothExp(p.x, target, rate, dt);
+  const leanTarget = clamp((target - p.x) * -2, -1, 1);
+  p.lean = smoothExp(p.lean, leanTarget, 10, dt);
 }
 
 function applyDrive(p, dt, race) {
@@ -386,7 +396,7 @@ function applyDrive(p, dt, race) {
       p.jumping = false;
       p.jumpHeight = 0;
       p.jumpCooldown = P.jumpCooldown;
-    } else p.jumpHeight = Math.sin(u * Math.PI);
+    } else p.jumpHeight = Math.sin(smoothStep(u) * Math.PI);
   }
 }
 

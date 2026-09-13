@@ -214,6 +214,7 @@ window.DogRace = window.DogRace || {};
         DogRace.Multiplayer.sendRaceInput(readInput());
         const state = DogRace.Multiplayer.getLatestRaceState();
         if (state) applyServerRaceState(state);
+        DogRace.interpolateServerVisuals(App.race, App.mpPlayerId, dt);
       } else {
         while (App.accum >= step) {
           DogRace.stepRace(App.race, readInput(), step);

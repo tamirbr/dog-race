@@ -585,8 +585,8 @@ window.DogRace = window.DogRace || {};
     function drawRacer(p, destX, destY, destW, clipY) {
       const spriteKey = (p.def.spriteId || p.def.id) + "_back";
       const img = DogRace.Assets.get(spriteKey);
-      const bounce = Math.sin(p.bounce * 2) * 0.06 + (p.boosting ? 0.04 : 0) + (p.jumpHeight || 0) * 0.08;
-      const lean = p.hitAnim > 0 ? Math.sin(p.hitAnim * 38) * 0.35 : p.lean * 0.22;
+      const bounce = Math.sin(p.bounce * 1.8) * 0.055 + (p.boosting ? 0.035 : 0) + (p.jumpHeight || 0) * 0.09;
+      const lean = p.hitAnim > 0 ? Math.sin(p.hitAnim * 38) * 0.35 : p.lean * 0.2;
       const destH = destW * (p.hitAnim > 0 ? 1.05 : 1.18);
       if (p.boosting) emitSmoke(race, destX, destY, destW, destH);
       ctx.save();

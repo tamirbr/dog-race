@@ -36,6 +36,15 @@ window.DogRace = window.DogRace || {};
     return Math.max(min, Math.min(max, v));
   }
 
+  function smoothExp(current, target, rate, dt) {
+    const t = 1 - Math.exp(-rate * dt);
+    return current + (target - current) * t;
+  }
+
+  function smoothStep(u) {
+    return u * u * (3 - 2 * u);
+  }
+
   function laneCount() {
     return DogRace.Config.race.lanes;
   }
@@ -255,20 +264,35 @@ window.DogRace = window.DogRace || {};
   function updateRemote(p, world, dt) {
     const target = p.remoteTarget;
     if (!target) return;
-    const rate = (DogRace.Config.multiplayer && DogRace.Config.multiplayer.positionLerp) || 12;
-    const t = 1 - Math.exp(-rate * dt);
-    p.z += (target.z - p.z) * t;
-    p.lane += (target.lane - p.lane) * t;
-    p.x += (target.x - p.x) * t;
-    p.speed += (target.speed - p.speed) * t;
+    const mp = DogRace.Config.multiplayer || {};
+    const posRate = mp.positionLerp || 16;
+    const leanRate = mp.remoteLeanRate || 11;
+    p.z = smoothExp(p.z, target.z, posRate, dt);
+    if (p.laneSmooth == null) p.laneSmooth = target.lane;
+    p.laneSmooth = smoothExp(p.laneSmooth, target.lane, posRate * 0.9, dt);
+    p.lane = clampLane(Math.round(p.laneSmooth));
+    p.x = smoothExp(p.x, target.x, posRate, dt);
+    p.speed = smoothExp(p.speed, target.speed || 0, posRate * 0.85, dt);
     p.boosting = target.boosting;
-    p.jumpHeight = target.jumpHeight || 0;
+    const jumpTarget = target.jumpHeight || 0;
+    p.jumpHeight = smoothExp(p.jumpHeight || 0, jumpTarget, 18, dt);
     if (target.finished) {
       p.finished = true;
       p.finishPlace = target.finishPlace || p.finishPlace;
     }
-    p.targetX = laneX(clampLane(Math.round(p.lane)));
+    const leanTarget = clamp((target.x - p.x) * -1.6, -1, 1);
+    p.lean = smoothExp(p.lean, leanTarget, leanRate, dt);
+    p.targetX = laneX(p.lane) + (p.packOffset || 0);
   }
+
+  DogRace.interpolateServerVisuals = function (race, localPlayerId, dt) {
+    if (!race || !race.serverAuthority) return;
+    race.participants.forEach((p) => {
+      if (p.id === localPlayerId) return;
+      if (p.remoteTarget) updateRemote(p, race, dt);
+    });
+    packSameLane(race);
+  };
 
   DogRace.applyRemoteSync = function (race, data) {
     if (!race || !data || !data.id) return;
@@ -311,24 +335,57 @@ window.DogRace = window.DogRace || {};
     (state.participants || []).forEach((sp) => {
       let p = race.participants.find((r) => r.id === sp.id);
       if (!p) return;
+      const isLocal = p.id === localPlayerId;
       const wasZ = p.z;
-      p.z = sp.z;
-      p.lane = sp.lane;
-      p.x = sp.x;
-      p.speed = sp.speed;
-      p.boosting = sp.boosting;
-      p.jumpHeight = sp.jumpHeight || 0;
-      p.finished = sp.finished;
-      p.finishPlace = sp.finishPlace;
+      if (isLocal) {
+        p.z = sp.z;
+        p.lane = sp.lane;
+        p.laneSmooth = sp.lane;
+        p.x = sp.x;
+        p.speed = sp.speed;
+        p.boosting = sp.boosting;
+        p.jumpHeight = sp.jumpHeight || 0;
+        p.finished = sp.finished;
+        p.finishPlace = sp.finishPlace;
+      } else {
+        p.remoteTarget = {
+          z: sp.z,
+          lane: sp.lane,
+          x: sp.x,
+          speed: sp.speed || 0,
+          finished: !!sp.finished,
+          finishPlace: sp.finishPlace || 0,
+          boosting: !!sp.boosting,
+          jumpHeight: sp.jumpHeight || 0,
+        };
+        if (!p._remoteInit) {
+          p.z = sp.z;
+          p.lane = sp.lane;
+          p.laneSmooth = sp.lane;
+          p.x = sp.x;
+          p.speed = sp.speed || 0;
+          p.boosting = sp.boosting;
+          p.jumpHeight = sp.jumpHeight || 0;
+          p.finished = sp.finished;
+          p.finishPlace = sp.finishPlace;
+          p._remoteInit = true;
+        }
+        if (sp.finished) {
+          p.finished = true;
+          p.finishPlace = sp.finishPlace;
+        }
+      }
       p.coins = sp.coins || 0;
       p.bounce += 0.12;
-      if (!p.finished && sp.finished && p.id === localPlayerId) {
+      if (!p.finished && sp.finished && isLocal) {
         race.events.push({ type: "finish", who: p });
       }
       if (sp.finished && !p._finishAnnounced) {
         p._finishAnnounced = true;
       }
-      if (Math.abs(sp.z - wasZ) > 0.5) p.lean = clamp((sp.z - wasZ) * 0.02, -1, 1);
+      if (isLocal && Math.abs(sp.z - wasZ) > 0.5) {
+        p.lean = clamp((sp.z - wasZ) * 0.02, -1, 1);
+      }
     });
 
     packSameLane(race);
@@ -426,14 +483,16 @@ window.DogRace = window.DogRace || {};
   }
 
   function applyLaneKeep(p, dt) {
+    const R = DogRace.Config.race;
     const iceMul = p.ice > 0 ? DogRace.Config.physics.iceHandlingMul : 1;
     const boostMul = p.boosting ? p.motion.handlingBoostBonus : 1;
     const handling = p.motion.handling * iceMul * boostMul;
     const target = laneX(p.lane) + (p.packOffset || 0);
-    const delta = target - p.x;
-    const step = Math.min(1, handling * dt * 2.4);
-    p.x += delta * step;
-    p.lean = clamp(p.lean * 0.8 + delta * 1.4, -1, 1);
+    const rate = (R.laneSmoothRate || 14) * (0.7 + handling * 0.12);
+    p.x = smoothExp(p.x, target, rate, dt);
+    const leanTarget = clamp((target - p.x) * -2, -1, 1);
+    p.lean = smoothExp(p.lean, leanTarget, R.laneLeanRate || 10, dt);
+    p.targetX = target;
   }
 
   function applyDrive(p, dt, world) {
@@ -518,7 +577,7 @@ window.DogRace = window.DogRace || {};
         p.jumpHeight = 0;
         p.jumpCooldown = P.jumpCooldown;
       } else {
-        p.jumpHeight = Math.sin(u * Math.PI);
+        p.jumpHeight = Math.sin(smoothStep(u) * Math.PI);
       }
     }
   }
