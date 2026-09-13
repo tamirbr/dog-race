@@ -77,6 +77,22 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
+    override fun onPause() {
+        super.onPause()
+        webView.evaluateJavascript(
+            "window.DogRace && DogRace.Audio && DogRace.Audio.pauseForBackground && DogRace.Audio.pauseForBackground()",
+            null
+        )
+    }
+
+    override fun onResume() {
+        super.onResume()
+        webView.evaluateJavascript(
+            "window.DogRace && DogRace.Audio && DogRace.Audio.resumeFromBackground && DogRace.Audio.resumeFromBackground()",
+            null
+        )
+    }
+
     private fun hideSystemUi() {
         WindowCompat.setDecorFitsSystemWindows(window, false)
         WindowInsetsControllerCompat(window, window.decorView).apply {

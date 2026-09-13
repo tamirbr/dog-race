@@ -14,6 +14,8 @@ window.DogRace = window.DogRace || {};
     swipe: { x: 0, y: 0, active: false },
     keys: {},
     canvas: null,
+    multiplayerRace: false,
+    mpPlayerId: null,
   };
 
   function $(id) {
@@ -21,6 +23,9 @@ window.DogRace = window.DogRace || {};
   }
 
   function go(name) {
+    if (name === "multiplayer" && DogRace.Multiplayer && DogRace.Multiplayer.getLobby()) {
+      name = "lobby";
+    }
     App.screen = name;
     DogRace.UI.show(name);
     if (name === "menu") DogRace.UI.renderMenu();
@@ -30,11 +35,22 @@ window.DogRace = window.DogRace || {};
     if (name === "missions") DogRace.UI.renderMissions();
     if (name === "settings") DogRace.UI.renderSettings();
     if (name === "tracks") DogRace.UI.renderTracks();
+    if (name === "multiplayer") {
+      if (DogRace.Multiplayer) DogRace.Multiplayer.ensureConnected().then(() => DogRace.UI.renderMultiplayerHub());
+      else DogRace.UI.renderMultiplayerHub();
+    }
+    if (name === "lobby") {
+      const lobby = DogRace.Multiplayer && DogRace.Multiplayer.getLobby();
+      if (lobby) DogRace.UI.renderLobby(lobby);
+    }
     if (name === "race") DogRace.Audio.setTheme("race");
     else if (name !== "splash") DogRace.Audio.setTheme("lobby");
   }
+  App.go = go;
 
   function startRace(trackId) {
+    App.multiplayerRace = false;
+    App.mpPlayerId = null;
     const track = DogRace.trackById(trackId) || DogRace.Tracks[0];
     App.lastTrackId = track.id;
     App.race = DogRace.createRace({
@@ -52,8 +68,53 @@ window.DogRace = window.DogRace || {};
     DogRace.Audio.play("countdown");
   }
 
+  function startMultiplayerRace(payload) {
+    if (!payload || !DogRace.Multiplayer) return;
+    const mp = DogRace.Multiplayer;
+    const localDogId = DogRace.Save.data.selectedDogId;
+    mp.setDog(localDogId);
+    App.mpPlayerId = mp.getPlayerId();
+    App.multiplayerRace = true;
+    App.lastTrackId = payload.trackId;
+    App.race = mp.buildRaceFromPayload(payload, App.mpPlayerId, localDogId);
+    App.paused = false;
+    App.input.laneDelta = 0;
+    App.input.boostRequest = false;
+    App.input.jump = false;
+    $("pause-overlay").classList.add("hidden");
+    DogRace.UI.setCountdown("3");
+    go("race");
+    DogRace.Audio.play("countdown");
+  }
+
+  function applyServerRaceState(state) {
+    if (!App.race || !state) return;
+    DogRace.applyServerRaceState(App.race, state, App.mpPlayerId);
+    handleEvents(App.race.events);
+    if (state.phase === "results" && !App.race._resultsHandled) {
+      App.race._resultsHandled = true;
+    }
+  }
+
+  function finishMultiplayerResults(data) {
+    if (!App.race || !data || !data.placements) return;
+    const mine = data.placements.find((p) => p.id === App.mpPlayerId);
+    if (!mine) return;
+    if (App.race.results) return;
+    DogRace.Multiplayer.stopSyncLoop();
+    App.race.results = DogRace.buildMultiplayerResults(App.race, mine, data.placements);
+    App.race.phase = "results";
+    finishRace();
+  }
+  App.startMultiplayerRace = startMultiplayerRace;
+  App.applyServerRaceState = applyServerRaceState;
+  App.finishMultiplayerResults = finishMultiplayerResults;
+
   function finishRace() {
     if (!App.race || !App.race.results) return;
+    if (App.multiplayerRace && DogRace.Multiplayer) {
+      DogRace.Multiplayer.stopSyncLoop();
+    }
     const outcome = DogRace.Save.applyRaceOutcome(App.race.results);
     const leveled = outcome.leveled || 0;
     DogRace.UI.renderResults(App.race.results, leveled);
@@ -149,11 +210,18 @@ window.DogRace = window.DogRace || {};
 
     if (App.screen === "race" && App.race && !App.paused) {
       const step = DogRace.Config.race.timestep;
-      while (App.accum >= step) {
-        DogRace.stepRace(App.race, readInput(), step);
-        handleEvents(App.race.events);
-        App.accum -= step;
-        if (App.screen !== "race") break;
+      if (App.multiplayerRace && App.race.serverAuthority) {
+        DogRace.Multiplayer.sendRaceInput(readInput());
+        const state = DogRace.Multiplayer.getLatestRaceState();
+        if (state) applyServerRaceState(state);
+        DogRace.interpolateServerVisuals(App.race, App.mpPlayerId, dt);
+      } else {
+        while (App.accum >= step) {
+          DogRace.stepRace(App.race, readInput(), step);
+          handleEvents(App.race.events);
+          App.accum -= step;
+          if (App.screen !== "race") break;
+        }
       }
       if (App.screen === "race" && App.race) {
         const canvas = App.canvas;
@@ -257,7 +325,9 @@ window.DogRace = window.DogRace || {};
       $("pause-overlay").classList.add("hidden");
     }
     if (action === "quit-race") {
+      if (App.multiplayerRace && DogRace.Multiplayer) DogRace.Multiplayer.stopSyncLoop();
       App.race = null;
+      App.multiplayerRace = false;
       go("menu");
     }
     if (action === "again") startRace(App.lastTrackId);
@@ -304,6 +374,98 @@ window.DogRace = window.DogRace || {};
     if (App.screen === "upgrades") DogRace.UI.renderUpgrades();
   }
 
+  async function handleMpAction(action, btn) {
+    const mp = DogRace.Multiplayer;
+    if (!mp) return;
+    if (!(await mp.ensureConnected())) {
+      DogRace.UI.toast(DogRace.I18n.t("mp.offline"), "📡");
+      return;
+    }
+    if (action === "rename") {
+      const res = await mp.rename($("mp-nickname-input").value);
+      if (res.ok) {
+        DogRace.UI.setMpNickname(res.nickname);
+        DogRace.Audio.play("pickup");
+      } else DogRace.UI.toast(DogRace.I18n.t("mp.nameTaken"), "⚠️");
+    }
+    if (action === "request-friend") {
+      const res = await mp.requestFriend($("mp-friend-input").value);
+      if (res.ok) {
+        $("mp-friend-input").value = "";
+        DogRace.UI.toast(DogRace.I18n.t("mp.requestSent"), "📨");
+        DogRace.UI.renderMpFriendRequests();
+      } else if (res.error === "already_friends") {
+        DogRace.UI.toast(DogRace.I18n.t("mp.alreadyFriends"), "🐾");
+      } else if (res.error === "already_sent") {
+        DogRace.UI.toast(DogRace.I18n.t("mp.requestPending"), "⏳");
+      } else DogRace.UI.toast(DogRace.I18n.t("mp.friendNotFound"), "❓");
+    }
+    if (action === "accept-friend") {
+      const res = await mp.acceptFriendRequest(btn.dataset.from);
+      if (res.ok) {
+        DogRace.UI.toast(DogRace.I18n.t("mp.friendAdded"), "🐾");
+        DogRace.UI.renderMpFriendRequests();
+        DogRace.UI.renderMpFriends();
+      }
+    }
+    if (action === "decline-friend") {
+      await mp.declineFriendRequest(btn.dataset.from);
+      DogRace.UI.renderMpFriendRequests();
+    }
+    if (action === "cancel-friend") {
+      await mp.cancelFriendRequest(btn.dataset.to);
+      DogRace.UI.renderMpFriendRequests();
+    }
+    if (action === "create-lobby") {
+      const res = await mp.createLobby("green_park");
+      if (res.ok) go("lobby");
+      else DogRace.UI.toast(DogRace.I18n.t("mp.error"), "⚠️");
+    }
+    if (action === "join-queue") {
+      const res = await mp.joinQueue();
+      if (res.ok) DogRace.UI.toast(DogRace.I18n.t("mp.queueJoined"), "🔍");
+      else DogRace.UI.toast(DogRace.I18n.t("mp.error"), "⚠️");
+    }
+    if (action === "leave-queue") {
+      await mp.leaveQueue();
+      DogRace.UI.renderMpQueue({ waiting: false });
+    }
+    if (action === "accept-invite") {
+      const res = await mp.acceptInvite();
+      if (res.ok) go("lobby");
+      else DogRace.UI.toast(DogRace.I18n.t("mp.error"), "⚠️");
+    }
+    if (action === "decline-invite") {
+      await mp.declineInvite();
+      DogRace.UI.hideMpInvite();
+    }
+    if (action === "invite-friend") {
+      const res = await mp.inviteFriend(btn.dataset.friendId);
+      if (res.ok) DogRace.UI.toast(DogRace.I18n.t("mp.inviteSent"), "📨");
+      else if (res.error === "not_friend") DogRace.UI.toast(DogRace.I18n.t("mp.notFriend"), "⚠️");
+      else DogRace.UI.toast(DogRace.I18n.t("mp.error"), "⚠️");
+    }
+    if (action === "quit-lobby") {
+      await mp.quitLobbyAndMenu();
+      go("multiplayer");
+    }
+    if (action === "lobby-track") {
+      await mp.setTrack(btn.dataset.track);
+    }
+    if (action === "lobby-add-bot") await mp.addBot();
+    if (action === "lobby-remove-bot") await mp.removeBot();
+    if (action === "lobby-kick") await mp.kickPlayer(btn.dataset.player);
+    if (action === "lobby-ready") {
+      const lobby = mp.getLobby();
+      const me = lobby && lobby.slots.find((s) => s.id === mp.getPlayerId());
+      await mp.setReady(!(me && me.ready));
+    }
+    if (action === "lobby-start") {
+      const res = await mp.startRace();
+      if (!res.ok) DogRace.UI.toast(DogRace.I18n.t("mp.notReady"), "⏳");
+    }
+  }
+
   function bindUi() {
     const unlockAudio = () => DogRace.Audio.unlock();
     document.body.addEventListener("pointerdown", unlockAudio, { passive: true });
@@ -311,9 +473,13 @@ window.DogRace = window.DogRace || {};
     window.addEventListener("keydown", unlockAudio);
     document.body.addEventListener("click", (e) => {
       DogRace.Audio.unlock();
-      const btn = e.target.closest("[data-go], [data-action], [data-select-dog], [data-buy-dog], [data-rename-dog], [data-upgrade], [data-track], [data-claim-mission], [data-set-lang]");
+      const btn = e.target.closest("[data-go], [data-action], [data-select-dog], [data-buy-dog], [data-rename-dog], [data-upgrade], [data-track], [data-claim-mission], [data-set-lang], [data-mp-action]");
       if (!btn) return;
       DogRace.Audio.play("click");
+      if (btn.dataset.mpAction) {
+        handleMpAction(btn.dataset.mpAction, btn);
+        return;
+      }
       if (btn.dataset.go) go(btn.dataset.go);
       if (btn.dataset.action) onAction(btn.dataset.action);
       if (btn.hasAttribute("data-set-lang")) {
@@ -425,6 +591,10 @@ window.DogRace = window.DogRace || {};
         return true;
       }
       if (App.screen !== "menu" && App.screen !== "splash") {
+        if (App.screen === "lobby" && DogRace.Multiplayer) {
+          DogRace.Multiplayer.quitLobbyAndMenu().then(() => go("multiplayer"));
+          return true;
+        }
         go("menu");
         return true;
       }
@@ -455,6 +625,11 @@ window.DogRace = window.DogRace || {};
     bindPointer();
     await DogRace.Assets.load();
     await DogRace.Audio.init();
+    if (DogRace.Multiplayer) {
+      DogRace.Multiplayer.onRaceStart(startMultiplayerRace);
+      DogRace.Multiplayer.onAvailabilityChange((on) => DogRace.UI.setMultiplayerVisible(on));
+      await DogRace.Multiplayer.init();
+    }
     requestAnimationFrame(tick);
     const params = new URLSearchParams(window.location.search);
     if (params.get("race")) {

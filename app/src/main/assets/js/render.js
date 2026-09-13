@@ -12,8 +12,9 @@ window.DogRace = window.DogRace || {};
     "menu_bg", "splash", "app_icon",
   ];
 
-  DogRace.Assets = {
+    DogRace.Assets = {
     images,
+    portraits: {},
     ready: false,
     async load() {
       await Promise.all(
@@ -27,12 +28,90 @@ window.DogRace = window.DogRace || {};
             })
         )
       );
+      DogRace.Dogs.forEach((dog) => {
+        if (dog.variantHue != null) {
+          const baseKey = (dog.spriteId || dog.id) + "_portrait";
+          const base = images[baseKey];
+          if (base && base.width) portraits[dog.id] = tintImage(base, dog.variantHue, dog.variantSat || 1);
+        }
+      });
       this.ready = true;
     },
     get(name) {
       return images[name];
     },
+    portraitFor(dog) {
+      if (!dog) return "";
+      if (portraits[dog.id]) return portraits[dog.id];
+      return dog.portrait;
+    },
   };
+
+  const portraits = DogRace.Assets.portraits;
+
+  function tintPixels(d, hueDeg, satMul) {
+    for (let i = 0; i < d.length; i += 4) {
+      if (d[i + 3] < 8) continue;
+      const r = d[i] / 255;
+      const g = d[i + 1] / 255;
+      const b = d[i + 2] / 255;
+      const max = Math.max(r, g, b);
+      const min = Math.min(r, g, b);
+      let h = 0;
+      const l = (max + min) / 2;
+      let s = max === min ? 0 : (max - min) / (1 - Math.abs(2 * l - 1));
+      if (max !== min) {
+        if (max === r) h = ((g - b) / (max - min) + 6) % 6;
+        else if (max === g) h = (b - r) / (max - min) + 2;
+        else h = (r - g) / (max - min) + 4;
+      }
+      h = (h * 60 + hueDeg + 360) % 360;
+      s = Math.min(1, s * satMul);
+      const c2 = (1 - Math.abs(2 * l - 1)) * s;
+      const x = c2 * (1 - Math.abs(((h / 60) % 2) - 1));
+      const m = l - c2 / 2;
+      let r2 = 0;
+      let g2 = 0;
+      let b2 = 0;
+      if (h < 60) { r2 = c2; g2 = x; }
+      else if (h < 120) { r2 = x; g2 = c2; }
+      else if (h < 180) { g2 = c2; b2 = x; }
+      else if (h < 240) { g2 = x; b2 = c2; }
+      else if (h < 300) { r2 = x; b2 = c2; }
+      else { r2 = c2; b2 = x; }
+      d[i] = Math.round((r2 + m) * 255);
+      d[i + 1] = Math.round((g2 + m) * 255);
+      d[i + 2] = Math.round((b2 + m) * 255);
+    }
+  }
+
+  function tintImage(img, hueDeg, satMul) {
+    const c = document.createElement("canvas");
+    c.width = img.width;
+    c.height = img.height;
+    const ctx = c.getContext("2d");
+    ctx.drawImage(img, 0, 0);
+    const data = ctx.getImageData(0, 0, c.width, c.height);
+    tintPixels(data.data, hueDeg, satMul);
+    ctx.putImageData(data, 0, 0);
+    return c.toDataURL("image/png");
+  }
+
+  function drawTintedSprite(ctx, img, x, y, w, h, clipY, bounce, lean, dogDef) {
+    if (!dogDef || dogDef.variantHue == null) {
+      drawWorldSprite(ctx, img, x, y, w, h, clipY, bounce, lean);
+      return;
+    }
+    const off = document.createElement("canvas");
+    off.width = Math.max(64, Math.floor(w * 1.2));
+    off.height = Math.max(64, Math.floor(h * 1.2));
+    const octx = off.getContext("2d");
+    drawWorldSprite(octx, img, off.width / 2, off.height * 0.55, w, h, off.height, bounce, lean);
+    const data = octx.getImageData(0, 0, off.width, off.height);
+    tintPixels(data.data, dogDef.variantHue, dogDef.variantSat || 1);
+    octx.putImageData(data, 0, 0);
+    ctx.drawImage(off, x - off.width / 2, y - off.height * 0.1, off.width, off.height);
+  }
 
   function project(p, cameraX, cameraY, cameraZ, cameraDepth, width, height, roadWidth) {
     p.camera.x = (p.world.x || 0) - cameraX;
@@ -506,8 +585,8 @@ window.DogRace = window.DogRace || {};
     function drawRacer(p, destX, destY, destW, clipY) {
       const spriteKey = (p.def.spriteId || p.def.id) + "_back";
       const img = DogRace.Assets.get(spriteKey);
-      const bounce = Math.sin(p.bounce * 2) * 0.06 + (p.boosting ? 0.04 : 0) + (p.jumpHeight || 0) * 0.08;
-      const lean = p.hitAnim > 0 ? Math.sin(p.hitAnim * 38) * 0.35 : p.lean * 0.22;
+      const bounce = Math.sin(p.bounce * 1.8) * 0.055 + (p.boosting ? 0.035 : 0) + (p.jumpHeight || 0) * 0.09;
+      const lean = p.hitAnim > 0 ? Math.sin(p.hitAnim * 38) * 0.35 : p.lean * 0.2;
       const destH = destW * (p.hitAnim > 0 ? 1.05 : 1.18);
       if (p.boosting) emitSmoke(race, destX, destY, destW, destH);
       ctx.save();
@@ -528,7 +607,7 @@ window.DogRace = window.DogRace || {};
       }
       if (p.hitAnim > 0) ctx.globalAlpha = 0.72;
       if (img && img.width) {
-        drawWorldSprite(ctx, img, destX, destY, destW, destH, clipY, bounce, lean);
+        drawTintedSprite(ctx, img, destX, destY, destW, destH, clipY, bounce, lean, p.def);
       } else {
         ctx.fillStyle = p.def.accent || "#F4A261";
         ctx.beginPath();

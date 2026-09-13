@@ -36,6 +36,15 @@ window.DogRace = window.DogRace || {};
     return Math.max(min, Math.min(max, v));
   }
 
+  function smoothExp(current, target, rate, dt) {
+    const t = 1 - Math.exp(-rate * dt);
+    return current + (target - current) * t;
+  }
+
+  function smoothStep(u) {
+    return u * u * (3 - 2 * u);
+  }
+
   function laneCount() {
     return DogRace.Config.race.lanes;
   }
@@ -194,7 +203,7 @@ window.DogRace = window.DogRace || {};
     segment.sprites.push(item);
   }
 
-  DogRace.buildCourse = function (track) {
+  DogRace.buildCourse = function (track, seed) {
     const C = DogRace.Config.race;
     const course = {
       track,
@@ -204,7 +213,7 @@ window.DogRace = window.DogRace || {};
       lastY: 0,
       finishZ: track.segments * C.segmentLength,
     };
-    const rng = mulberry32(hashString(track.id + ":v1"));
+    const rng = mulberry32(seed != null ? seed : hashString(track.id + ":v1"));
     track.layout.forEach((piece) => {
       addRoad(course, piece.enter, piece.hold, piece.leave, piece.curve, piece.hill);
     });
@@ -251,6 +260,175 @@ window.DogRace = window.DogRace || {};
     }
     return found;
   }
+
+  function updateRemote(p, world, dt) {
+    const target = p.remoteTarget;
+    if (!target) return;
+    const mp = DogRace.Config.multiplayer || {};
+    const posRate = mp.positionLerp || 16;
+    const leanRate = mp.remoteLeanRate || 11;
+    p.z = smoothExp(p.z, target.z, posRate, dt);
+    if (p.laneSmooth == null) p.laneSmooth = target.lane;
+    p.laneSmooth = smoothExp(p.laneSmooth, target.lane, posRate * 0.9, dt);
+    p.lane = clampLane(Math.round(p.laneSmooth));
+    p.x = smoothExp(p.x, target.x, posRate, dt);
+    p.speed = smoothExp(p.speed, target.speed || 0, posRate * 0.85, dt);
+    p.boosting = target.boosting;
+    const jumpTarget = target.jumpHeight || 0;
+    p.jumpHeight = smoothExp(p.jumpHeight || 0, jumpTarget, 18, dt);
+    if (target.finished) {
+      p.finished = true;
+      p.finishPlace = target.finishPlace || p.finishPlace;
+    }
+    const leanTarget = clamp((target.x - p.x) * -1.6, -1, 1);
+    p.lean = smoothExp(p.lean, leanTarget, leanRate, dt);
+    p.targetX = laneX(p.lane) + (p.packOffset || 0);
+  }
+
+  DogRace.interpolateServerVisuals = function (race, localPlayerId, dt) {
+    if (!race || !race.serverAuthority) return;
+    race.participants.forEach((p) => {
+      if (p.id === localPlayerId) return;
+      if (p.remoteTarget) updateRemote(p, race, dt);
+    });
+    packSameLane(race);
+  };
+
+  DogRace.applyRemoteSync = function (race, data) {
+    if (!race || !data || !data.id) return;
+    const p = race.participants.find((r) => r.id === data.id);
+    if (!p || p.kind !== Kind.REMOTE) return;
+    p.remoteTarget = {
+      z: data.z,
+      lane: data.lane,
+      x: data.x,
+      speed: data.speed || 0,
+      finished: !!data.finished,
+      finishPlace: data.finishPlace || 0,
+      boosting: !!data.boosting,
+      jumpHeight: data.jumpHeight || 0,
+    };
+  };
+
+  DogRace.applyServerRaceState = function (race, state, localPlayerId) {
+    if (!race || !state) return;
+    const prevPhase = race.phase;
+    const prevCount = race.lastCount;
+    race.phase = state.phase;
+    race.time = state.time;
+    race.countdown = state.countdown;
+    race.serverAuthority = true;
+    race.events.length = 0;
+
+    if (state.phase === "countdown") {
+      const n = Math.ceil(state.countdown);
+      if (n !== prevCount && n > 0 && n <= 3) {
+        race.events.push({ type: "count", value: n });
+        race.lastCount = n;
+      }
+    }
+    if (prevPhase === "countdown" && state.phase === "running") {
+      race.events.push({ type: "go" });
+      race.lastCount = 0;
+    }
+
+    (state.participants || []).forEach((sp) => {
+      let p = race.participants.find((r) => r.id === sp.id);
+      if (!p) return;
+      const isLocal = p.id === localPlayerId;
+      const wasZ = p.z;
+      if (isLocal) {
+        p.z = sp.z;
+        p.lane = sp.lane;
+        p.laneSmooth = sp.lane;
+        p.x = sp.x;
+        p.speed = sp.speed;
+        p.boosting = sp.boosting;
+        p.jumpHeight = sp.jumpHeight || 0;
+        p.finished = sp.finished;
+        p.finishPlace = sp.finishPlace;
+      } else {
+        p.remoteTarget = {
+          z: sp.z,
+          lane: sp.lane,
+          x: sp.x,
+          speed: sp.speed || 0,
+          finished: !!sp.finished,
+          finishPlace: sp.finishPlace || 0,
+          boosting: !!sp.boosting,
+          jumpHeight: sp.jumpHeight || 0,
+        };
+        if (!p._remoteInit) {
+          p.z = sp.z;
+          p.lane = sp.lane;
+          p.laneSmooth = sp.lane;
+          p.x = sp.x;
+          p.speed = sp.speed || 0;
+          p.boosting = sp.boosting;
+          p.jumpHeight = sp.jumpHeight || 0;
+          p.finished = sp.finished;
+          p.finishPlace = sp.finishPlace;
+          p._remoteInit = true;
+        }
+        if (sp.finished) {
+          p.finished = true;
+          p.finishPlace = sp.finishPlace;
+        }
+      }
+      p.coins = sp.coins || 0;
+      p.bounce += 0.12;
+      if (!p.finished && sp.finished && isLocal) {
+        race.events.push({ type: "finish", who: p });
+      }
+      if (sp.finished && !p._finishAnnounced) {
+        p._finishAnnounced = true;
+      }
+      if (isLocal && Math.abs(sp.z - wasZ) > 0.5) {
+        p.lean = clamp((sp.z - wasZ) * 0.02, -1, 1);
+      }
+    });
+
+    packSameLane(race);
+    rankParticipants(race);
+    race.player = race.participants.find((p) => p.id === localPlayerId) || race.player;
+  };
+
+  DogRace.buildMultiplayerResults = function (race, placement, allPlacements) {
+    const eco = DogRace.Config.economy;
+    const km = DogRace.Config.kidMode || {};
+    const kidMul = DogRace.Save && DogRace.Save.data && DogRace.Save.data.settings.kidMode ? (km.coinBonusMul || 1) : 1;
+    const place = placement.place;
+    const placeCoins = Math.round((eco.placeCoins[place - 1] || 25) * race.track.rewardMultiplier * kidMul);
+    const pickedCoins = placement.coins || 0;
+    const xp = Math.round(((eco.placeXp[place - 1] || 20) + eco.finishXp) * race.track.rewardMultiplier);
+    const stars = place === 1 ? 3 : place <= 3 ? 2 : 1;
+    const ranked = (allPlacements || []).slice().sort((a, b) => a.place - b.place).map((row) => {
+      const p = race.participants.find((r) => r.id === row.id);
+      return {
+        id: row.id,
+        name: row.nickname || (p && p.name) || row.id,
+        place: row.place,
+        dogId: row.dogId,
+        isBot: row.isBot,
+      };
+    });
+    return {
+      place,
+      stars,
+      field: race.participants.length,
+      dogId: race.player.dogId,
+      trackId: race.track.id,
+      placeCoins,
+      pickedCoins,
+      totalCoins: placeCoins + pickedCoins,
+      xp,
+      time: placement.time || race.time,
+      hits: race.player.hits,
+      boostsUsed: race.player.boostsUsed,
+      ranked,
+      multiplayer: true,
+    };
+  };
 
   function updateLocal(p, input) {
     if (input.laneDelta) p.lane = clampLane(p.lane + input.laneDelta);
@@ -305,14 +483,16 @@ window.DogRace = window.DogRace || {};
   }
 
   function applyLaneKeep(p, dt) {
+    const R = DogRace.Config.race;
     const iceMul = p.ice > 0 ? DogRace.Config.physics.iceHandlingMul : 1;
     const boostMul = p.boosting ? p.motion.handlingBoostBonus : 1;
     const handling = p.motion.handling * iceMul * boostMul;
     const target = laneX(p.lane) + (p.packOffset || 0);
-    const delta = target - p.x;
-    const step = Math.min(1, handling * dt * 2.4);
-    p.x += delta * step;
-    p.lean = clamp(p.lean * 0.8 + delta * 1.4, -1, 1);
+    const rate = (R.laneSmoothRate || 14) * (0.7 + handling * 0.12);
+    p.x = smoothExp(p.x, target, rate, dt);
+    const leanTarget = clamp((target - p.x) * -2, -1, 1);
+    p.lean = smoothExp(p.lean, leanTarget, R.laneLeanRate || 10, dt);
+    p.targetX = target;
   }
 
   function applyDrive(p, dt, world) {
@@ -397,7 +577,7 @@ window.DogRace = window.DogRace || {};
         p.jumpHeight = 0;
         p.jumpCooldown = P.jumpCooldown;
       } else {
-        p.jumpHeight = Math.sin(u * Math.PI);
+        p.jumpHeight = Math.sin(smoothStep(u) * Math.PI);
       }
     }
   }
@@ -507,52 +687,72 @@ window.DogRace = window.DogRace || {};
     };
   }
 
-  DogRace.createRace = function ({ track, playerDogId, fieldSize }) {
-    const course = DogRace.buildCourse(track);
+  DogRace.createRace = function ({ track, playerDogId, fieldSize, participants, seed, multiplayer, startAt, serverAuthority }) {
+    const course = DogRace.buildCourse(track, seed);
     const difficulty = raceDifficulty(track.aiDifficulty);
-    const player = createParticipant({
-      id: "player",
-      kind: Kind.LOCAL,
-      dogId: playerDogId,
-      name: DogRace.Save.dogName(playerDogId),
-      lane: 1,
-      z: 200,
-    });
-    const opponents = [];
-    const pool = DogRace.Dogs.filter((d) => d.id !== playerDogId);
-    const extras = DogRace.Dogs.slice();
-    while (pool.length < fieldSize - 1) pool.push(extras[pool.length % extras.length]);
-    const aiStarts = [
-      { lane: 0, z: 420 },
-      { lane: 2, z: 380 },
-      { lane: 1, z: 500 },
-      { lane: 0, z: 460 },
-      { lane: 2, z: 340 },
-    ];
-    for (let i = 0; i < fieldSize - 1; i++) {
-      const dog = pool[i % pool.length];
-      const slot = aiStarts[i % aiStarts.length];
-      opponents.push(
+    let field;
+    let player;
+
+    if (participants && participants.length) {
+      field = participants.map((spec) =>
         createParticipant({
-          id: "ai-" + i,
-          kind: Kind.AI,
-          dogId: dog.id,
-          name: dog.name,
-          lane: slot.lane,
-          z: slot.z,
+          id: spec.id,
+          kind: spec.kind,
+          dogId: spec.dogId,
+          name: spec.name,
+          lane: spec.lane,
+          z: spec.z,
         })
       );
+      player = field.find((p) => p.kind === Kind.LOCAL) || field[0];
+    } else {
+      player = createParticipant({
+        id: "player",
+        kind: Kind.LOCAL,
+        dogId: playerDogId,
+        name: DogRace.Save.dogName(playerDogId),
+        lane: 1,
+        z: 200,
+      });
+      const opponents = [];
+      const pool = DogRace.Dogs.filter((d) => d.id !== playerDogId);
+      const extras = DogRace.Dogs.slice();
+      while (pool.length < fieldSize - 1) pool.push(extras[pool.length % extras.length]);
+      const aiStarts = [
+        { lane: 0, z: 420 },
+        { lane: 2, z: 380 },
+        { lane: 1, z: 500 },
+        { lane: 0, z: 460 },
+        { lane: 2, z: 340 },
+      ];
+      for (let i = 0; i < fieldSize - 1; i++) {
+        const dog = pool[i % pool.length];
+        const slot = aiStarts[i % aiStarts.length];
+        opponents.push(
+          createParticipant({
+            id: "ai-" + i,
+            kind: Kind.AI,
+            dogId: dog.id,
+            name: dog.name,
+            lane: slot.lane,
+            z: slot.z,
+          })
+        );
+      }
+      field = [player].concat(opponents);
     }
-    const field = [player].concat(opponents);
+
     field.slice().sort((a, b) => b.z - a.z).forEach((p, i) => {
       p.finishPlace = i + 1;
     });
+
+    const raceSeed = seed != null ? seed : hashString(track.id + playerDogId + Date.now());
 
     return {
       track,
       course,
       difficulty,
-      rng: mulberry32(hashString(track.id + playerDogId + Date.now())),
+      rng: mulberry32(raceSeed),
       participants: field,
       player,
       events: [],
@@ -563,6 +763,9 @@ window.DogRace = window.DogRace || {};
       finished: false,
       results: null,
       bursts: [],
+      multiplayer: !!multiplayer,
+      startAt: startAt || 0,
+      serverAuthority: !!serverAuthority,
     };
   };
 
@@ -594,6 +797,7 @@ window.DogRace = window.DogRace || {};
     race.participants.forEach((p) => {
       if (p.kind === Kind.LOCAL) updateLocal(p, input);
       else if (p.kind === Kind.AI) updateAi(p, world, dt);
+      else if (p.kind === Kind.REMOTE) updateRemote(p, world, dt);
       applyLaneKeep(p, dt);
       applyDrive(p, dt, world);
       collideItems(p, world);

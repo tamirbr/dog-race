@@ -134,41 +134,11 @@ window.DogRace = window.DogRace || {};
       const dog = DogRace.Save.selectedDog();
       const state = DogRace.Save.dogState(dog.id);
       const name = DogRace.Save.dogName(dog.id);
-      $("menu-dog").src = dog.portrait;
+      $("menu-dog").src = DogRace.Assets.portraitFor ? DogRace.Assets.portraitFor(dog) : dog.portrait;
       $("menu-dog").alt = name;
       $("menu-dog-name").textContent = name;
       $("menu-dog-info").textContent = t("menu.levelInfo", { level: state.level, breed: dogBreed(dog) });
-      this.renderMenuGoal();
       this.refreshCoins();
-    },
-
-    renderMenuGoal() {
-      const host = $("menu-goal");
-      if (!host) return;
-      const next = DogRace.Save.nextMission();
-      if (!next) {
-        host.innerHTML = `<div class="goal-inner done"><span class="goal-icon">🎉</span><div><strong>${escapeHtml(t("ui.allMissionsDone"))}</strong><p>${escapeHtml(t("ui.keepRacing"))}</p></div></div>`;
-        return;
-      }
-      const m = next.mission;
-      const icon = m.icon || "🎯";
-      const hintKey = "mission." + m.id + ".hint";
-      const hint = t(hintKey) !== hintKey ? t(hintKey) : (m.hint || t("mission." + m.id + ".desc"));
-      const pct = missionProgressPct(next.progress, m.target);
-      const claimBtn = next.ready
-        ? `<button class="btn mint mini" data-go="missions">${escapeHtml(t("ui.claimReady"))}</button>`
-        : `<button class="btn ghost mini" data-go="missions">${escapeHtml(t("ui.viewMissions"))}</button>`;
-      host.innerHTML = `<div class="goal-inner ${next.ready ? "ready" : ""}">
-        <span class="goal-icon">${icon}</span>
-        <div class="goal-body">
-          <strong>${escapeHtml(t("ui.nextGoal"))}</strong>
-          <p>${escapeHtml(t("mission." + m.id + ".name"))}</p>
-          <small>${escapeHtml(hint)}</small>
-          <div class="goal-bar"><i style="width:${pct}%"></i></div>
-          <span class="goal-count">${next.progress}/${m.target}</span>
-        </div>
-        ${claimBtn}
-      </div>`;
     },
 
     renderDogs() {
@@ -189,7 +159,7 @@ window.DogRace = window.DogRace || {};
           action = `<button class="btn gold mini" data-buy-dog="${dog.id}">${dog.unlockCost} 🪙</button>`;
         }
         return `<article class="dog-card ${state.owned ? "" : "locked"}">
-          <img src="${dog.portrait}" alt="${escapeHtml(name)}" />
+          <img src="${DogRace.Assets.portraitFor ? DogRace.Assets.portraitFor(dog) : dog.portrait}" alt="${escapeHtml(name)}" />
           <div>
             <h3>${escapeHtml(name)}</h3>
             <div class="rarity" style="color:${rarity.color}">${t("rarity." + dog.rarity)} · ${escapeHtml(dogBreed(dog))}</div>
@@ -441,6 +411,200 @@ window.DogRace = window.DogRace || {};
       if (confetti) {
         if (win || podium) spawnConfetti(confetti, win ? 48 : 24);
         else confetti.innerHTML = "";
+      }
+    },
+
+    setMultiplayerVisible(show) {
+      document.querySelectorAll(".mp-only").forEach((el) => {
+        el.classList.toggle("hidden", !show);
+      });
+    },
+
+    setMpNickname(name) {
+      const el = $("mp-nickname");
+      if (el) el.textContent = name || "";
+      const input = $("mp-nickname-input");
+      if (input && document.activeElement !== input) input.value = name || "";
+    },
+
+    renderMultiplayerHub() {
+      this.setMpNickname($("mp-nickname-input")?.value || "");
+      this.renderMpFriendRequests();
+      this.renderMpFriends();
+      this.renderMpQueue({ waiting: DogRace.Multiplayer && DogRace.Multiplayer.isQueueWaiting() });
+    },
+
+    renderMpFriendRequests() {
+      const mp = DogRace.Multiplayer;
+      if (!mp) return;
+      const data = mp.getFriendRequests() || { incoming: [], outgoing: [] };
+      const incomingHost = $("mp-requests-incoming");
+      const outgoingHost = $("mp-requests-outgoing");
+      if (incomingHost) {
+        if (!data.incoming.length) {
+          incomingHost.innerHTML = `<p class="muted mp-empty">${escapeHtml(t("mp.noIncoming"))}</p>`;
+        } else {
+          incomingHost.innerHTML = data.incoming
+            .map(
+              (r) => `<div class="mp-friend-row pending">
+                <div><strong>${escapeHtml(r.nickname)}</strong><small>${escapeHtml(t("mp.incomingRequest"))}</small></div>
+                <div class="row">
+                  <button class="btn mint mini" data-mp-action="accept-friend" data-from="${escapeHtml(r.id)}">${escapeHtml(t("mp.accept"))}</button>
+                  <button class="btn ghost mini" data-mp-action="decline-friend" data-from="${escapeHtml(r.id)}">${escapeHtml(t("mp.decline"))}</button>
+                </div>
+              </div>`
+            )
+            .join("");
+        }
+      }
+      if (outgoingHost) {
+        if (!data.outgoing.length) {
+          outgoingHost.innerHTML = `<p class="muted mp-empty">${escapeHtml(t("mp.noOutgoing"))}</p>`;
+        } else {
+          outgoingHost.innerHTML = data.outgoing
+            .map(
+              (r) => `<div class="mp-friend-row pending">
+                <div><strong>${escapeHtml(r.nickname)}</strong><small>${escapeHtml(t("mp.outgoingRequest"))}</small></div>
+                <button class="btn ghost mini" data-mp-action="cancel-friend" data-to="${escapeHtml(r.id)}">${escapeHtml(t("mp.cancel"))}</button>
+              </div>`
+            )
+            .join("");
+        }
+      }
+    },
+
+    renderMpFriends() {
+      const host = $("mp-friends-list");
+      if (!host || !DogRace.Multiplayer) return;
+      const friends = DogRace.Multiplayer.getFriends();
+      if (!friends.length) {
+        host.innerHTML = `<p class="muted mp-empty">${escapeHtml(t("mp.noFriends"))}</p>`;
+        return;
+      }
+      host.innerHTML = friends
+        .map((f) => {
+          const status = f.status === "lobby" ? t("mp.inLobby") : f.status === "racing" ? t("mp.racing") : f.online ? t("mp.online") : t("mp.offline");
+          return `<div class="mp-friend-row">
+            <div><strong>${escapeHtml(f.nickname)}</strong><small>${escapeHtml(status)}</small></div>
+          </div>`;
+        })
+        .join("");
+    },
+
+    renderLobbyFriends(declinedNickname) {
+      const host = $("lobby-friends-list");
+      const section = $("lobby-invite-friends");
+      const lobby = DogRace.Multiplayer && DogRace.Multiplayer.getLobby();
+      if (!host || !section || !lobby) return;
+      if (!lobby.isHost) {
+        section.classList.add("hidden");
+        return;
+      }
+      section.classList.remove("hidden");
+      const friends = DogRace.Multiplayer.getFriends();
+      if (!friends.length) {
+        host.innerHTML = `<p class="muted mp-empty">${escapeHtml(t("mp.noFriends"))}</p>`;
+        return;
+      }
+      const inLobby = new Set((lobby.slots || []).map((s) => s.id));
+      host.innerHTML = friends
+        .map((f) => {
+          const inAlready = inLobby.has(f.id);
+          const declined = declinedNickname === f.nickname;
+          const status = declined
+            ? t("mp.declinedInvite")
+            : inAlready
+              ? t("mp.inLobby")
+              : f.online
+                ? t("mp.online")
+                : t("mp.offline");
+          const inviteBtn = inAlready
+            ? `<button class="btn mini" disabled>${escapeHtml(t("mp.inLobby"))}</button>`
+            : `<button class="btn sky mini" data-mp-action="invite-friend" data-friend-id="${escapeHtml(f.id)}">${escapeHtml(t("mp.invite"))}</button>`;
+          return `<div class="mp-friend-row ${declined ? "declined" : ""}">
+            <div><strong>${escapeHtml(f.nickname)}</strong><small>${escapeHtml(status)}</small></div>
+            ${inviteBtn}
+          </div>`;
+        })
+        .join("");
+    },
+
+    renderMpQueue(data) {
+      const el = $("mp-queue-status");
+      if (!el) return;
+      el.textContent = data && data.waiting ? t("mp.queueWaiting", { n: data.players || "?" }) : t("mp.queueIdle");
+    },
+
+    showMpInvite(data) {
+      const box = $("mp-invite-banner");
+      if (!box) return;
+      box.classList.remove("hidden");
+      $("mp-invite-text").textContent = t("mp.inviteFrom", { name: data.from });
+      box.dataset.lobbyId = data.lobbyId;
+    },
+
+    hideMpInvite() {
+      const box = $("mp-invite-banner");
+      if (box) box.classList.add("hidden");
+    },
+
+    renderLobby(lobby) {
+      if (!lobby) return;
+      const trackEl = $("lobby-track-select");
+      if (trackEl && lobby.isHost) {
+        trackEl.innerHTML = DogRace.Tracks.map(
+          (tr) =>
+            `<button class="btn mini ${lobby.trackId === tr.id ? "gold" : "ghost"}" data-mp-action="lobby-track" data-track="${tr.id}">${escapeHtml(t("track." + tr.id + ".name"))}</button>`
+        ).join("");
+        trackEl.classList.remove("hidden");
+      } else if (trackEl) {
+        trackEl.classList.add("hidden");
+      }
+      const trackName = $("lobby-track-name");
+      if (trackName) trackName.textContent = t("track." + lobby.trackId + ".name");
+      const list = $("lobby-players");
+      if (list) {
+        list.innerHTML = (lobby.slots || [])
+          .map((s) => {
+            const dog = DogRace.dogById(s.dogId);
+            const portrait = dog && DogRace.Assets.portraitFor ? DogRace.Assets.portraitFor(dog) : "";
+            const kick =
+              lobby.isHost && !s.isBot && s.id !== lobby.hostId
+                ? `<button class="btn ghost mini" data-mp-action="lobby-kick" data-player="${s.id}">✕</button>`
+                : "";
+            const tags = [
+              s.isBot ? t("mp.bot") : "",
+              s.id === lobby.hostId ? t("mp.host") : "",
+              s.ready ? t("mp.ready") : "",
+              !s.isBot && s.online === false ? t("mp.offline") : "",
+            ]
+              .filter(Boolean)
+              .join(" · ");
+            return `<div class="lobby-player ${s.ready ? "ready" : ""}">
+              <img src="${portrait}" alt="" />
+              <div><strong>${escapeHtml(s.nickname)}</strong><small>${escapeHtml(tags)}</small></div>
+              ${kick}
+            </div>`;
+          })
+          .join("");
+      }
+      const hostControls = $("lobby-host-controls");
+      if (hostControls) hostControls.classList.toggle("hidden", !lobby.isHost);
+      const readyBtn = $("btn-lobby-ready");
+      if (readyBtn) {
+        const myId = DogRace.Multiplayer && DogRace.Multiplayer.getPlayerId();
+        const me = (lobby.slots || []).find((s) => s.id === myId);
+        readyBtn.textContent = me && me.ready ? t("mp.unready") : t("mp.readyUp");
+      }
+      const stateEl = $("lobby-state");
+      if (stateEl) stateEl.textContent = lobby.state === "racing" ? t("mp.racing") : t("mp.waiting");
+      this.renderLobbyFriends();
+    },
+
+    onLobbyLeft() {
+      this.hideMpInvite();
+      if (window.DogRaceApp && DogRaceApp.screen === "lobby") {
+        window.DogRaceApp.go("multiplayer");
       }
     },
   };

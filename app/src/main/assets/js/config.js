@@ -19,9 +19,11 @@ DogRace.Config = {
     fieldOfView: 100,
     cameraHeight: 300,
     cameraDistance: 240,
-    cameraFollowX: 10,
-    cameraFollowY: 7,
-    cameraFollowZ: 12,
+    cameraFollowX: 8,
+    cameraFollowY: 6,
+    cameraFollowZ: 10,
+    laneSmoothRate: 14,
+    laneLeanRate: 10,
     curveScale: 0.18,
     renderSteps: 12,
     drawDistance: 170,
@@ -131,4 +133,13 @@ DogRace.Config = {
   },
 
   saveKey: "dograce.save.v1",
+
+  multiplayer: {
+    backendUrl: null,
+    probeIntervalMs: 30000,
+    probeTimeoutMs: 2500,
+    syncIntervalMs: 100,
+    positionLerp: 16,
+    remoteLeanRate: 11,
+  },
 };
